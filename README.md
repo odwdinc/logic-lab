@@ -1,6 +1,6 @@
 # Logic Lab
 
-A browser-based logic circuit editor. No installation, no build step — open `index.html` and start building.
+A browser-based logic circuit editor. No installation, no build step — Open the ![demo](https://odwdinc.github.io/logic-lab/) and start building.
 
 ![Logic Lab](https://img.shields.io/badge/runs%20in-browser-4fc3f7?style=flat-square)
 ![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey?style=flat-square)
