@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logic Lab Editor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#181a1e;--surface:#22252c;--surface2:#2c3038;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.14);
+  --text:#dde0ec;--muted:#5a5e72;--accent:#4fc3f7;
+  --font:'JetBrains Mono',monospace;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);user-select:none}
+#app{display:flex;flex-direction:column;width:100vw;height:100vh}
+#topbar{height:38px;background:#0f1014;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 10px;gap:0;flex-shrink:0;z-index:20}
+.tb-logo{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.12em;margin-right:12px}
+.tb-sep{width:1px;height:22px;background:var(--border2);margin:0 8px}
+.tb-btn{height:27px;padding:0 9px;border:1px solid var(--border2);border-radius:3px;
+  background:var(--surface);color:var(--text);font-family:var(--font);font-size:11px;
+  cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;transition:background .1s}
+.tb-btn:hover{background:var(--surface2);border-color:rgba(255,255,255,.22)}
+.tb-btn.primary{background:#133a52;border-color:var(--accent);color:var(--accent)}
+.tb-btn.primary:hover{background:#1a4f6e}
+#breadcrumb{display:flex;align-items:center;gap:0;margin-left:8px;overflow:hidden;flex:1}
+#circuit-tabs{display:flex;align-items:stretch;gap:0;flex:1;overflow-x:auto;min-width:0}
+#circuit-tabs::-webkit-scrollbar{height:3px}
+#circuit-tabs::-webkit-scrollbar-thumb{background:var(--surface2)}
+.ctab{display:flex;align-items:center;gap:5px;padding:0 10px 0 12px;height:38px;font-size:11px;
+  color:var(--muted);cursor:pointer;border-right:1px solid var(--border);white-space:nowrap;
+  position:relative;flex-shrink:0;transition:background .1s;user-select:none}
+.ctab:hover{background:var(--surface);color:var(--text)}
+.ctab.active{background:var(--surface);color:var(--text);border-bottom:2px solid var(--accent)}
+.ctab.active.editing{border-bottom-color:#f0a940;color:#f0a940}
+.ctab-close{font-size:13px;color:var(--muted);line-height:1;padding:1px 2px;border-radius:2px;
+  margin-left:2px;opacity:0;transition:opacity .1s}
+.ctab:hover .ctab-close{opacity:1}
+.ctab-close:hover{color:#e74c3c;background:rgba(231,76,60,.15)}
+.bc-crumb{display:flex;align-items:center;gap:4px;font-size:11px}
+.bc-item{color:var(--muted);cursor:pointer;padding:2px 4px;border-radius:3px}
+.bc-item:hover{color:var(--text);background:var(--surface2)}
+.bc-item.active{cursor:default}
+.bc-arrow{font-size:10px;color:var(--muted)}
+#sim-status{margin-left:auto;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.sim-dot{width:7px;height:7px;border-radius:50%;background:#27ae60}
+#main{display:flex;flex:1;overflow:hidden}
+#left-panel{width:172px;flex-shrink:0;background:#0f1014;border-right:1px solid var(--border);
+  display:flex;flex-direction:column;transition:width .18s ease,border-color .18s ease;overflow:hidden}
+#left-panel.collapsed{width:28px;border-right-color:var(--border)}
+#left-panel.collapsed #block-library{display:none}
+#left-panel.collapsed #blocks-label{display:none}
+#left-panel.collapsed #btn-toggle-blocks{transform:rotate(180deg)}
+#left-panel.collapsed .panel-head{justify-content:center!important}
+.panel-head{padding:7px 10px;font-size:9px;font-weight:700;letter-spacing:.14em;color:var(--muted);border-bottom:1px solid var(--border);flex-shrink:0}
+#block-library{flex:1;overflow-y:auto;padding:5px}
+#block-library::-webkit-scrollbar{width:3px}
+#block-library::-webkit-scrollbar-thumb{background:var(--surface2)}
+.lib-section{margin-bottom:8px}
+.lib-section-title{font-size:9px;color:var(--muted);letter-spacing:.1em;padding:3px 4px 2px}
+.lib-item{padding:5px 8px;border-radius:3px;border:1px solid var(--border);background:var(--surface);
+  margin-bottom:3px;cursor:grab;font-size:11px;font-weight:500;
+  display:flex;align-items:center;gap:6px;transition:background .08s}
+.lib-item:hover{background:var(--surface2);border-color:var(--border2)}
+.lib-badge{font-size:8px;padding:1px 4px;border-radius:2px;font-weight:700;letter-spacing:.04em}
+#canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--bg)}
+#canvas{position:absolute;top:0;left:0;cursor:crosshair}
+#right-panel{width:196px;max-width:600px;flex-shrink:0;background:#0f1014;
+  border-left:1px solid var(--border);display:flex;flex-direction:column;position:relative}
+#right-panel-resize{
+  position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;
+  display:flex;align-items:center;justify-content:center}
+#right-panel-resize::after{
+  content:'';display:block;width:1px;height:32px;
+  background:var(--border2);border-radius:1px;transition:background .15s,width .15s}
+#right-panel-resize:hover::after,#right-panel-resize.dragging::after{
+  background:var(--accent);width:2px}
+#prop-panel{flex:1;overflow-y:auto;padding:8px}
+#prop-panel::-webkit-scrollbar{width:3px}
+#prop-panel::-webkit-scrollbar-thumb{background:var(--surface2)}
+.prop-title{font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--muted);margin-bottom:8px}
+.prop-row{margin-bottom:7px}
+.prop-label{font-size:9px;color:var(--muted);margin-bottom:3px;letter-spacing:.06em}
+.prop-val{font-size:11px;color:var(--text)}
+.prop-input{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:3px;
+  color:var(--text);font-family:var(--font);font-size:11px;padding:4px 7px;outline:none}
+.prop-input:focus{border-color:var(--accent)}
+.prop-sep{height:1px;background:var(--border);margin:8px 0}
+.port-list{display:flex;flex-direction:column;gap:5px}
+.port-entry{display:flex;align-items:center;gap:5px;font-size:10px}
+.port-entry-name{flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.port-val-display{font-size:10px;padding:1px 5px;border-radius:2px;font-weight:700;font-family:var(--font)}
+.pv-0{background:#2a1414;color:#c0392b}
+.pv-1{background:#142814;color:#4ecb8d}
+.pv-z{background:#1a1a2a;color:#7c7cb0}
+.pv-x{background:#1e1e1e;color:#444}
+.pv-bus{background:#1a2a1a;color:#4ecb8d}
+.disp-fmt-btn{font-size:9px;padding:1px 5px;border-radius:2px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--surface2);color:var(--muted)}
+.disp-fmt-btn:hover{color:var(--text)}
+#bottombar{height:28px;background:#0f1014;border-top:1px solid var(--border);
+  display:flex;align-items:center;padding:0 10px;gap:8px;font-size:10px;color:var(--muted);flex-shrink:0}
+#modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:200;align-items:center;justify-content:center}
+#modal-backdrop.open{display:flex}
+#modal{background:#1a1d22;border:1px solid var(--border2);border-radius:7px;
+  padding:18px;min-width:320px;max-width:480px;width:90%}
+#modal h3{font-size:13px;font-weight:700;margin-bottom:5px}
+#modal p{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.7}
+.mf{margin-bottom:10px}
+.mf label{display:block;font-size:9px;color:var(--muted);margin-bottom:3px;letter-spacing:.06em}
+.mf input,.mf select,.mf textarea{width:100%;background:var(--surface);border:1px solid var(--border2);
+  border-radius:3px;color:var(--text);font-family:var(--font);font-size:11px;padding:5px 8px;outline:none}
+.mf input:focus,.mf select:focus,.mf textarea:focus{border-color:var(--accent)}
+.mf select option{background:#1a1d22}
+.mf textarea{height:70px;resize:none}
+.modal-actions{display:flex;gap:7px;justify-content:flex-end;margin-top:14px}
+.port-cfg-row{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.port-cfg-row input{flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border2);border-radius:3px;
+  color:var(--text);font-family:var(--font);font-size:11px;padding:3px 6px;outline:none}
+.port-cfg-row input:focus{border-color:var(--accent)}
+.port-cfg-row select{background:var(--surface2);border:1px solid var(--border2);border-radius:3px;
+  color:var(--text);font-family:var(--font);font-size:10px;padding:3px 4px;outline:none}
+.port-cfg-box{background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:7px;margin-top:5px}
+#ctx-menu{display:none;position:fixed;z-index:300;background:#1a1d22;
+  border:1px solid var(--border2);border-radius:4px;padding:3px;min-width:130px;box-shadow:0 4px 18px rgba(0,0,0,.6)}
+#ctx-menu.open{display:block}
+.ctx-item{padding:5px 9px;font-size:11px;border-radius:3px;cursor:pointer;color:var(--text)}
+.ctx-item:hover{background:var(--surface2)}
+.ctx-item.danger{color:#e74c3c}
+.ctx-item.danger:hover{background:rgba(231,76,60,.12)}
+.ctx-sep{height:1px;background:var(--border);margin:2px 0}
+#toast{position:fixed;bottom:38px;left:50%;transform:translateX(-50%) translateY(14px);
+  background:var(--surface2);border:1px solid var(--border2);border-radius:4px;
+  padding:6px 13px;font-size:11px;color:var(--text);opacity:0;
+  transition:opacity .18s,transform .18s;pointer-events:none;z-index:400}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="tb-logo">LOGIC LAB</span>
+    <div class="tb-sep"></div>
+    <button class="tb-btn primary" id="btn-save-block" title="Save current circuit as a reusable block">⊞ Save as Block</button>
+    <button class="tb-btn" id="btn-update-block" style="display:none;background:#2d4a1a;border-color:#6abf40;color:#a8e060">⟳ Update Block</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-new-circuit" title="New circuit">⊕ New</button>
+    <button class="tb-btn" id="btn-rename-circuit" title="Rename current circuit">✎ Rename</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-save-project" title="Export / backup (Ctrl+S)">↓ Export</button>
+    <button class="tb-btn" id="btn-load-project" title="Import (Ctrl+O)">↑ Import</button>
+    <button class="tb-btn" id="btn-load-demo" title="Load demo circuits">★ Demos</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="btn-bus-vals" title="Toggle bus value labels on wires">🏷 Values</button>
+    <div id="breadcrumb">
+      <div id="circuit-tabs"></div>
+      <div id="bc-crumbs" class="bc-crumb" style="padding-left:8px;flex-shrink:0"></div>
+    </div>
+    <div id="sim-status"><span class="sim-dot" id="save-dot" title="Auto-saved"></span><span id="sim-text">sim running</span></div>
+  </div>
+  <div id="main">
+    <div id="left-panel">
+      <div class="panel-head" style="display:flex;align-items:center;justify-content:space-between">
+        <span id="blocks-label">BLOCKS</span>
+        <button id="btn-toggle-blocks" title="Hide/show blocks panel"
+          style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 2px;line-height:1">◀</button>
+      </div>
+      <div id="block-library"></div>
+    </div>
+    <div id="canvas-wrap"><canvas id="canvas"></canvas></div>
+    <div id="right-panel" style="width:0;overflow:hidden;border-left-width:0" data-visible="0" data-saved-width="196">
+      <div id="right-panel-resize" title="Drag to resize"></div>
+      <div class="panel-head">PROPERTIES</div>
+      <div id="prop-panel"></div>
+    </div>
+  </div>
+  <div id="bottombar">
+    <span id="mode-hint">drag port→port to wire · alt+drag to pan · scroll to zoom · F to fit</span>
+    <span style="margin-left:auto" id="coords">x:0 y:0</span>
+  </div>
+</div>
+<div id="modal-backdrop">
+  <div id="modal">
+    <h3 id="modal-title"></h3><p id="modal-desc"></p>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="tb-btn" id="modal-cancel">Cancel</button>
+      <button class="tb-btn primary" id="modal-ok">OK</button>
+    </div>
+  </div>
+</div>
+<div id="ctx-menu"></div>
+<div id="toast"></div>
+
+<script src="core/ll-nodes.js"></script>
+<script src="nodes/node-AND.js"></script>
+<script src="nodes/node-OR.js"></script>
+<script src="nodes/node-NAND.js"></script>
+<script src="nodes/node-NOR.js"></script>
+<script src="nodes/node-XOR.js"></script>
+<script src="nodes/node-NOT.js"></script>
+<script src="nodes/node-TRIBUF.js"></script>
+<script src="nodes/node-IO-BUS.js"></script>
+<script src="nodes/node-CLOCK.js"></script>
+<script src="nodes/node-RAM.js"></script>
+<script src="nodes/node-DISPLAY.js"></script>
+<script src="nodes/node-ANALYZER.js"></script>
+<script src="nodes/node-IO-WEB.js"></script>
+<script src="core/ll-state.js"></script>
+<script src="core/ll-color.js"></script>
+<script src="core/ll-simulate.js"></script>
+<script src="core/ll-geometry.js"></script>
+<script src="core/ll-canvas.js"></script>
+<script src="core/ll-render.js"></script>
+<script src="core/ll-resize.js"></script>
+<script src="core/ll-events.js"></script>
+<script src="core/ll-blocks.js"></script>
+<script src="core/ll-nav.js"></script>
+<script src="core/ll-props.js"></script>
+<script src="core/ll-core.js"></script>
+</body>
+</html>

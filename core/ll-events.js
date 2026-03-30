@@ -1,0 +1,217 @@
+// Logic Lab
+
+//  MOUSE EVENTS
+// ═══════════════════════════════════════════════════════════════
+
+let isPanning=false,panSX=0,panSY=0,panVX=0,panVY=0;
+
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const {cx,cy}=getXY(e);
+  const wb=c2w(cx,cy);
+  vpScale=Math.max(0.15,Math.min(3,vpScale*(e.deltaY<0?1.1:0.91)));
+  const wa=c2w(cx,cy);
+  vpX+=wb.x-wa.x; vpY+=wb.y-wa.y; render();
+},{passive:false});
+
+canvas.addEventListener('mousedown',e=>{
+  const {cx,cy}=getXY(e);
+  const {x:wx,y:wy}=c2w(cx,cy);
+  if(e.button===1||(e.button===0&&e.altKey)){
+    isPanning=true;panSX=cx;panSY=cy;panVX=vpX;panVY=vpY;canvas.style.cursor='grabbing';return;
+  }
+  if(e.button===2) return;
+
+  // ── Resize handle hit (must check before port/node) ──
+  const rh=hitResizeHandle(wx,wy);
+  if(rh){
+    const n=circuits[currentCircuitId].nodes[selNodeId];
+    const g=nodeGeom(n);
+    dragMode='resize'; dragNodeId=selNodeId; resizeHandle=rh;
+    resizeSnap={mx:wx,my:wy,nx:n.x,ny:n.y,nw:g.w,nh:g.h};
+    canvas.style.cursor=rh.cur; return;
+  }
+
+  const ph=hitPort(wx,wy);
+  if(ph){
+    wireStart={nodeId:ph.node.id,portId:ph.portId};
+    wireMouseX=wx;wireMouseY=wy;dragMode='wire';canvas.style.cursor='crosshair';return;
+  }
+  const nh=hitNode(wx,wy);
+  if(nh){
+    const def=blockDefs[nh.defId];
+    // Delegate cell click to descriptor hook (e.g. INPUT bit toggle)
+    if(descClickCell(nh, wx, wy, currentCircuitId)) return;
+    if(e.shiftKey){
+      // Shift+click: toggle node in/out of selection
+      if(selNodeIds.has(nh.id)) selNodeIds.delete(nh.id);
+      else selNodeIds.add(nh.id);
+      selNodeId=selNodeIds.size===1?[...selNodeIds][0]:null;
+      updatePropPanel();render();return;
+    }
+    if(selNodeIds.has(nh.id)&&selNodeIds.size>1){
+      // Drag the whole multi-selection
+      dragMode='nodes';dragOffX=wx;dragOffY=wy;
+      dragNodesSnap={};
+      selNodeIds.forEach(id=>{const n=circuits[currentCircuitId].nodes[id];if(n)dragNodesSnap[id]={x:n.x,y:n.y};});
+      canvas.style.cursor='grabbing';return;
+    }
+    // Single select + drag
+    selNodeIds=new Set([nh.id]);
+    selNodeId=nh.id;dragMode='node';dragNodeId=nh.id;
+    dragOffX=wx-nh.x;dragOffY=wy-nh.y;
+    canvas.style.cursor='grabbing';updatePropPanel();render();return;
+  }
+  // Empty space: start rubber-band; clear selection unless shift-extending
+  if(!e.shiftKey){selNodeIds.clear();selNodeId=null;}
+  selBoxStart={x:wx,y:wy};selBoxEnd={x:wx,y:wy};
+  dragMode='select';updatePropPanel();render();
+});
+
+canvas.addEventListener('mousemove',e=>{
+  const {cx,cy}=getXY(e);
+  const {x:wx,y:wy}=c2w(cx,cy);
+  mouseWX=wx;mouseWY=wy;
+  document.getElementById('coords').textContent=`x:${Math.round(wx)} y:${Math.round(wy)} ${Math.round(vpScale*100)}%`;
+  if(isPanning){vpX=panVX-(cx-panSX)/vpScale;vpY=panVY-(cy-panSY)/vpScale;render();return;}
+  if(dragMode==='select'){
+    selBoxEnd={x:wx,y:wy};render();return;
+  }
+  if(dragMode==='nodes'){
+    const dx=Math.round((wx-dragOffX)/10)*10;
+    const dy=Math.round((wy-dragOffY)/10)*10;
+    const c=circuits[currentCircuitId];
+    selNodeIds.forEach(id=>{const n=c.nodes[id];if(n&&dragNodesSnap[id]){n.x=dragNodesSnap[id].x+dx;n.y=dragNodesSnap[id].y+dy;}});
+    simulate(currentCircuitId);return;
+  }
+  if(dragMode==='node'){
+    const n=circuits[currentCircuitId].nodes[dragNodeId];
+    if(n){n.x=Math.round((wx-dragOffX)/10)*10;n.y=Math.round((wy-dragOffY)/10)*10;}
+    simulate(currentCircuitId);return;
+  }
+  if(dragMode==='wire'){
+    wireMouseX=wx;wireMouseY=wy;
+    const ph=hitPort(wx,wy);
+    hovPortKey=ph?ph.node.id+'_'+ph.portId:null;
+    render();return;
+  }
+  if(dragMode==='resize'){
+    applyResize(wx,wy);
+    render(); updatePropPanel(); return;
+  }
+  // Hover — check resize handles first, then port dots, then IO cells, then nodes
+  const rh=hitResizeHandle(wx,wy);
+  if(rh){canvas.style.cursor=rh.cur;return;}
+  const ph=hitPort(wx,wy);
+  if(ph){
+    if(hovPortKey!==ph.node.id+'_'+ph.portId){
+      hovPortKey=ph.node.id+'_'+ph.portId; hovNodeId=ph.node.id;
+      canvas.style.cursor='crosshair'; render();
+    }
+    return;
+  }
+  // Check if over a clickable cell (pointer cursor)
+  if(descHitCell(wx,wy)){
+    if(hovPortKey!==null||canvas.style.cursor!=='pointer'){
+      hovPortKey=null; canvas.style.cursor='pointer'; render();
+    }
+    return;
+  }
+  const nh=hitNode(wx,wy);
+  const newHovNode=nh?.id||null;
+  if(hovPortKey!==null||hovNodeId!==newHovNode){
+    hovPortKey=null; hovNodeId=newHovNode;
+    canvas.style.cursor=nh?'grab':'default';
+    render();
+  } else if(!nh) canvas.style.cursor='default';
+});
+
+canvas.addEventListener('mouseup',e=>{
+  if(isPanning){isPanning=false;canvas.style.cursor='default';return;}
+  if(dragMode==='select'){
+    if(selBoxStart&&selBoxEnd){
+      const x1=Math.min(selBoxStart.x,selBoxEnd.x),y1=Math.min(selBoxStart.y,selBoxEnd.y);
+      const x2=Math.max(selBoxStart.x,selBoxEnd.x),y2=Math.max(selBoxStart.y,selBoxEnd.y);
+      if(x2-x1>4||y2-y1>4){
+        Object.values(circuits[currentCircuitId].nodes).forEach(n=>{
+          const g=nodeGeom(n);
+          if(g.x<x2&&g.x+g.w>x1&&g.y<y2&&g.y+g.h>y1) selNodeIds.add(n.id);
+        });
+      }
+      selNodeId=selNodeIds.size===1?[...selNodeIds][0]:null;
+    }
+    selBoxStart=null;selBoxEnd=null;dragMode=null;canvas.style.cursor='default';
+    updatePropPanel();render();return;
+  }
+  if(dragMode==='nodes'){
+    dragMode=null;dragNodesSnap=null;canvas.style.cursor='default';
+    simulate(currentCircuitId);return;
+  }
+  if(dragMode==='node'){dragMode=null;canvas.style.cursor='default';simulate(currentCircuitId);return;}
+  if(dragMode==='resize'){
+    dragMode=null;resizeHandle=null;resizeSnap=null;
+    canvas.style.cursor='default';simulate(currentCircuitId);return;
+  }
+  if(dragMode==='wire'&&wireStart){
+    const {cx,cy}=getXY(e);
+    const {x:wx,y:wy}=c2w(cx,cy);
+    const ph=hitPort(wx,wy);
+    if(ph&&ph.node.id!==wireStart.nodeId){
+      const fnId=wireStart.nodeId,fpId=wireStart.portId;
+      const tnId=ph.node.id,tpId=ph.portId;
+      const fnNode=circuits[currentCircuitId].nodes[fnId];
+      const tnNode=circuits[currentCircuitId].nodes[tnId];
+      const fndef=blockDefs[fnNode?.defId];
+      const tnDef=blockDefs[tnNode?.defId];
+      const fnPorts=getNodePorts(fnNode,fndef);
+      const tnPorts=getNodePorts(tnNode,tnDef);
+      const fpdef=fnPorts.find(p=>p.id===fpId);
+      const tnpdef=tnPorts.find(p=>p.id===tpId);
+      let af=fnId,afp=fpId,at=tnId,atp=tpId;
+      // auto-swap if needed (allow wiring in either direction)
+      if(fpdef?.dir==='in'&&tnpdef?.dir==='out'){af=tnId;afp=tpId;at=fnId;atp=fpId;}
+      const srcNode=circuits[currentCircuitId].nodes[af];
+      const srcDef=blockDefs[srcNode?.defId];
+      const srcPorts=getNodePorts(srcNode,srcDef);
+      const spp=srcPorts.find(p=>p.id===afp);
+      if(spp?.dir==='out') addWire(currentCircuitId,af,afp,at,atp);
+      else toast('Connect an output port to an input port');
+    }
+    wireStart=null;dragMode=null;hovPortKey=null;canvas.style.cursor='default';render();
+  }
+});
+canvas.addEventListener('mouseleave',()=>{
+  isPanning=false;dragMode=null;wireStart=null;
+  selBoxStart=null;selBoxEnd=null;
+  render();
+});
+
+canvas.addEventListener('dblclick',e=>{
+  const {cx,cy}=getXY(e);
+  const {x:wx,y:wy}=c2w(cx,cy);
+  const n=hitNode(wx,wy);
+  if(n){
+    const def=blockDefs[n.defId];
+    if(def?.circuit) enterBlock(n.defId, n.id, currentCircuitId);
+    else if(def?.isIO){
+      document.getElementById('modal-body').innerHTML=`
+        <div class="mf"><label>LABEL</label>
+          <input id="rename-inp" class="prop-input" value="${(n.label||def.name).replace(/"/g,'&quot;')}" maxlength="24" autofocus></div>`;
+      openModal('Rename Node','',()=>{
+        const v=document.getElementById('rename-inp')?.value?.trim();
+        if(v){n.label=v.slice(0,24);render();updatePropPanel();}
+      },'Rename');
+      setTimeout(()=>{ const el=document.getElementById('rename-inp'); if(el){el.select();} },50);
+    }
+  }
+});
+
+canvas.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  const {cx,cy}=getXY(e);
+  const {x:wx,y:wy}=c2w(cx,cy);
+  const n=hitNode(wx,wy), wi=hitWire(wx,wy);
+  showCtx(e.clientX,e.clientY,n,wi);
+});
+
+// ═══════════════════════════════════════════════════════════════
