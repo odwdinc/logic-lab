@@ -36,7 +36,7 @@ function patchPropPanelLive(){
     el.className='port-val-display '+cls;
   });
 
-  // Node-specific live patches (clock phase, analyzer status, RAM highlights)
+  // Node-specific live patches (clock phase, analyzer status, ROM highlights)
   patchDescLive(n, def);
 }
 
@@ -112,10 +112,6 @@ function updatePropPanel(){
   // Node-specific event binding — delegated to registry descriptor
   bindDescProps(n, def, currentCircuitId);
 }
-
-// ═══════════════════════════════════════════════════════════════
-//  RAM TABLE HELPERS
-// ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
 //  LIBRARY

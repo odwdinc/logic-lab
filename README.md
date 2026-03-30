@@ -17,7 +17,7 @@ Logic Lab lets you design and simulate digital logic circuits in real time:
 - **Multi-bit buses** — scale any I/O node from 1 to 8 bits; ribbon wires show each lane in its own color
 - **Clocks** — configurable square-wave oscillators (0.001–50 Hz) drive sequential logic
 - **7-segment displays** — visualise BCD values with up to 3 digits, signed or unsigned
-- **RAM** — 256×16 memory with an interactive table; read and write cells directly
+- **ROM** — 256×16 memory with an interactive table; read from cells directly
 - **Logic analyser** — capture up to 1024 samples across 8 channels, triggered or free-running; export as CSV
 - **Custom blocks** — select any sub-circuit, save it as a reusable block, and drag instances from the library
 - **Multi-select** — rubber-band select a group of nodes and move them together
@@ -31,7 +31,7 @@ Most logic simulators require installation, a specific OS, or a paid licence. Lo
 
 - **Teaching** — share a single `index.html` with students; they open it in any browser and start experimenting immediately
 - **Prototyping** — quickly sketch a latch, counter, or ALU slice to verify logic before committing it to HDL or a schematic tool
-- **Exploring** — the built-in demos (gates, SR latch, buses, 7-seg display, logic analyser, RAM) show real circuits you can poke and modify straight away
+- **Exploring** — the built-in demos (gates, SR latch, buses, 7-seg display, logic analyser, ROM) show real circuits you can poke and modify straight away
 - **Embedding** — because it's pure HTML + JS with no build pipeline, it can be dropped into any web page or documentation site
 
 ---

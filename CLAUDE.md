@@ -19,7 +19,7 @@ Logic Lab is a browser-based logic circuit editor. It runs entirely from static 
 │   ├── node-TRIBUF.js
 │   ├── node-IO-BUS.js  — INPUT, OUTPUT, BITS→BUS, BUS→BITS; drawIONode; demo()
 │   ├── node-CLOCK.js   — CLK; _clockTimers; startClockTimer/stopClockTimer/syncClockTimers
-│   ├── node-RAM.js     — RAM; fmtRamCell; buildRamTableHTML; refreshRamTable; demo()
+│   ├── node-ROM.js     — ROM; fmtRomCell; buildRomTableHTML; refreshRomTable; demo()
 │   ├── node-DISPLAY.js — 7-SEG; SEG_MAP; draw7Seg; demo()
 │   ├── node-ANALYZER.js — ANALYZER; _analyzerTimers; syncAnalyzerTimers; drawAnalyzer; demo()
 │   └── node-IO-WEB.js — WEB_INPUT example; _webTimers; polls a URL and drives a bus output
@@ -104,7 +104,7 @@ Any node file can be commented out of `index.html` without breaking the engine �
         // node-specific private state prefixed with _
         _hz, _phase,            // CLOCK
         _laState, _laRec, ...   // ANALYZER
-        _ram, _ramFmt,          // RAM
+        _rom, _romFmt,          // ROM
         _dispVal, _dispNeg, ... // DISPLAY
       }
     },
