@@ -30,6 +30,7 @@ The NAND gate is famously "universal" — every other logic gate can be built fr
     {
       title: 'Verify the Truth Table',
       text: `The only time the output goes low (0) is when both inputs are high. Every other combination outputs 1.`,
+      saveBlock: 'NAND',
       test: {
         inputs:  ['A', 'B'],
         outputs: ['OUT'],
@@ -40,17 +41,6 @@ The NAND gate is famously "universal" — every other logic gate can be built fr
           { in: [1, 1], out: [0] },
         ],
       },
-    },
-    {
-      title: 'Save as Block',
-      text: `You will need this NAND gate in the next lesson. Save it as a reusable block:
-
-1. Drag a selection box around all the nodes (or press Ctrl+A if supported)
-2. Right-click any selected node → "Save as Block"
-3. Name it exactly:  NAND
-
-Once saved, the NAND block appears in your library panel and you can drag it into any future circuit.`,
-      blockCheck: 'NAND',
     },
     {
       title: 'Key Insight',

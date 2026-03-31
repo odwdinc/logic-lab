@@ -16,25 +16,38 @@ You are going to build it by inverting both inputs with NOT gates, then feeding 
     },
     {
       title: 'Build the Circuit',
-      text: `The A, B inputs and OUT output have been placed for you.
+      text: `The circuit has been built for you. Trace the wires:
 
-From the library, drag in:
-  · Two NOT gates
-  · Your saved NAND block
-
-Wire them up:
   A ── NOT ──┐
               NAND ── OUT
-  B ── NOT ──┘`,
+  B ── NOT ──┘
+
+Both inputs are inverted before reaching the NAND gate. De Morgan's theorem guarantees this is equivalent to OR. Try each input combination and verify the output matches what you expect from OR.`,
       build(cid) {
-        const gA = addNode(cid, 'INPUT',   60,  80, 'A');  gA._value = 0;
-        const gB = addNode(cid, 'INPUT',   60, 200, 'B');  gB._value = 0;
-        addNode(cid, 'OUTPUT', 520, 140, 'OUT');
+        const nandDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'NAND');
+        if (!nandDef) return;
+        const nandA   = nandDef.ports.find(p => p.dir==='in'  && p.name==='A')?.id;
+        const nandB   = nandDef.ports.find(p => p.dir==='in'  && p.name==='B')?.id;
+        const nandOut = nandDef.ports.find(p => p.dir==='out')?.id;
+
+        const gA    = addNode(cid, 'INPUT',     60,  60, 'A');   gA._value = 0;
+        const gB    = addNode(cid, 'INPUT',     60, 180, 'B');   gB._value = 0;
+        const gNA   = addNode(cid, 'NOT',       220,  60, '');
+        const gNB   = addNode(cid, 'NOT',       220, 180, '');
+        const gNAND = addNode(cid, nandDef.id,  390, 120, '');
+        const gOut  = addNode(cid, 'OUTPUT',    560, 120, 'OUT');
+
+        addWire(cid, gA.id,    'out',    gNA.id,   'a');
+        addWire(cid, gB.id,    'out',    gNB.id,   'a');
+        addWire(cid, gNA.id,   'out',    gNAND.id, nandA);
+        addWire(cid, gNB.id,   'out',    gNAND.id, nandB);
+        addWire(cid, gNAND.id, nandOut,  gOut.id,  'a');
       },
     },
     {
       title: 'Verify the Truth Table',
       text: `Only the first row (both inputs 0) produces a 0 output. Every other combination produces 1.`,
+      saveBlock: 'OR',
       test: {
         inputs:  ['A', 'B'],
         outputs: ['OUT'],
@@ -45,15 +58,6 @@ Wire them up:
           { in: [1, 1], out: [1] },
         ],
       },
-    },
-    {
-      title: 'Save as Block',
-      text: `The next lesson needs an OR gate. Save your circuit as a block:
-
-1. Select all nodes (drag a selection box around everything)
-2. Right-click any selected node → "Save as Block"
-3. Name it exactly:  OR`,
-      blockCheck: 'OR',
     },
     {
       title: 'Key Insight',

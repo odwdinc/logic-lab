@@ -14,6 +14,7 @@ const _ls = {
   builtSteps: new Set(),
   rowsDone:   new Set(),   // indices of test rows the user has reproduced
   pollTimer:  null,
+  collapsed:  false,
 };
 
 function registerLesson(desc) {
@@ -24,16 +25,12 @@ function _saveDone() {
   localStorage.setItem(_LS_DONE_KEY, JSON.stringify([..._lessonDone]));
 }
 
-// ── Live polling ─────────────────────────────────────────────────
-// Runs while a test or blockCheck step is visible.
-//
-// test step:       polls INPUT._value and OUTPUT.portValues.a against truth table rows.
-//                  Checks off rows as the user reproduces each combination.
-//                  Marks lesson done when all rows pass, UNLESS the lesson also has
-//                  a blockCheck step (in that case blockCheck marks done).
-//
-// blockCheck step: polls blockDefs for a user-saved block with the specified name.
-//                  Marks lesson done and stops poll when found.
+// ── Live row polling ─────────────────────────────────────────────
+// Runs while a test step is visible. Compares the circuit's current
+// INPUT._value and OUTPUT.portValues.a against the truth table rows.
+// When a matching row is found it is checked off. When all rows are
+// done the lesson is marked complete, and if the step has saveBlock
+// the circuit is automatically saved as a block.
 
 function _startPoll() {
   if (_ls.pollTimer) return;
@@ -47,21 +44,8 @@ function _stopPoll() {
 
 function _pollStep() {
   const step = _ls.lesson?.steps[_ls.step];
-  if (!step?.test && !step?.blockCheck) { _stopPoll(); return; }
+  if (!step?.test) { _stopPoll(); return; }
 
-  // ── blockCheck ──
-  if (step.blockCheck) {
-    const found = Object.values(blockDefs).some(d => !d.isBuiltin && d.name === step.blockCheck);
-    if (found) {
-      _lessonDone.add(_ls.lesson.id);
-      _saveDone();
-      _stopPoll();
-      _renderLessonPanel();
-    }
-    return;
-  }
-
-  // ── test step ──
   const c = circuits[_ls.cid];
   if (!c) return;
 
@@ -90,14 +74,13 @@ function _pollStep() {
   if (changed) {
     const allDone = _ls.rowsDone.size === rows.length;
     if (allDone) {
-      // Only mark the lesson done here if it has no blockCheck step.
-      // If it does, blockCheck is the completion gate (so the required block
-      // exists before dependent lessons unlock).
-      const hasBlockCheck = _ls.lesson.steps.some(s => s.blockCheck);
-      if (!hasBlockCheck) {
-        _lessonDone.add(_ls.lesson.id);
-        _saveDone();
+      // Auto-save as a block if the step requests it
+      if (step.saveBlock) {
+        saveAsBlock(_ls.cid, step.saveBlock, step.blockColor || '#9b59b6');
+        toast(`"${step.saveBlock}" saved to library`);
       }
+      _lessonDone.add(_ls.lesson.id);
+      _saveDone();
       _stopPoll();
     }
     _renderLessonPanel();
@@ -171,7 +154,7 @@ function openLesson(lessonId) {
 
 function _runStepAction() {
   const step = _ls.lesson?.steps[_ls.step];
-  if (step?.test || step?.blockCheck) _startPoll();
+  if (step?.test) _startPoll();
   if (!step?.build || _ls.builtSteps.has(_ls.step)) return;
   _ls.builtSteps.add(_ls.step);
   step.build(_ls.cid);
@@ -196,15 +179,44 @@ function _lessonPrev() {
   _ls.step--;
   _ls.rowsDone = new Set();
   _renderLessonPanel();
-  // Don't re-run build on going back; do restart poll if returning to test/blockCheck step
+  // Don't re-run build on going back; do restart poll if returning to a test step
   const step = _ls.lesson.steps[_ls.step];
-  if (step?.test || step?.blockCheck) _startPoll();
+  if (step?.test) _startPoll();
 }
 
 function _closeLessonPanel() {
   _stopPoll();
+  _ls.lesson    = null;
+  _ls.collapsed = false;
   document.getElementById('lesson-panel').style.display = 'none';
-  _ls.lesson = null;
+}
+
+function _finishLesson() {
+  _stopPoll();
+  const lesson  = _ls.lesson;
+  const oldCid  = _ls.cid;
+  _ls.lesson    = null;
+  _ls.collapsed = false;
+  document.getElementById('lesson-panel').style.display = 'none';
+  if (lesson && _lessonDone.has(lesson.id)) {
+    const idx  = _lessonRegistry.findIndex(l => l.id === lesson.id);
+    const next = _lessonRegistry[idx + 1];
+    if (next && !(next.requires || []).some(r => !_lessonDone.has(r))) {
+      openLesson(next.id);
+      if (oldCid && oldCid !== 'main') _origCloseCircuit(oldCid);
+      return;
+    }
+  }
+}
+
+// Show panel when on the lesson circuit; hide (without clearing state) on other tabs
+function _syncLessonPanelVisibility(cid) {
+  if (!_ls.lesson) return;
+  if (cid === _ls.cid) {
+    _renderLessonPanel();
+  } else {
+    document.getElementById('lesson-panel').style.display = 'none';
+  }
 }
 
 // ── Panel Render ─────────────────────────────────────────────────
@@ -213,16 +225,30 @@ function _renderLessonPanel() {
   if (!_ls.lesson) return;
   const panel  = document.getElementById('lesson-panel');
   const lesson = _ls.lesson;
+
+  // ── Collapsed: header strip only ─────────────────────────────
+  if (_ls.collapsed) {
+    panel.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;font-weight:700;color:var(--accent);flex:1;
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lesson.title}</span>
+        <button id="lp-expand" style="background:none;border:none;color:var(--muted);
+          cursor:pointer;font-size:13px;line-height:1;padding:0 2px" title="Expand">▲</button>
+      </div>`;
+    panel.style.display = 'flex';
+    document.getElementById('lp-expand').addEventListener('click', () => {
+      _ls.collapsed = false;
+      _renderLessonPanel();
+    });
+    return;
+  }
+
   const step   = lesson.steps[_ls.step];
   const total  = lesson.steps.length;
   const isFirst = _ls.step === 0;
   const isLast  = _ls.step === total - 1;
   const done    = _lessonDone.has(lesson.id);
-
-  const testPassed  = !step.test || done || _ls.rowsDone.size === step.test?.rows.length;
-  const blockPassed = !step.blockCheck ||
-    Object.values(blockDefs).some(d => !d.isBuiltin && d.name === step.blockCheck);
-  const canAdvance  = testPassed && blockPassed;
+  const canAdvance = !step.test || done || _ls.rowsDone.size === step.test?.rows.length;
 
   // Progress dots
   const dots = Array.from({ length: total }, (_, i) =>
@@ -253,10 +279,12 @@ function _renderLessonPanel() {
       return `<tr style="background:${bg}">${tdIn}${tdOut}${tdChk}</tr>`;
     }).join('');
 
+    const saveNote = step.saveBlock && !allDone
+      ? `<span style="color:var(--accent)"> · saves as <b>${step.saveBlock}</b> when complete</span>` : '';
     const progress = `<div style="margin-top:7px;font-size:10px;color:var(--muted)">
       ${allDone
-        ? `<span style="color:#4ecb8d;font-weight:700">✓ All combinations verified!</span>`
-        : `Try each combination on the canvas &nbsp;·&nbsp; <span style="color:var(--text)">${_ls.rowsDone.size}/${rows.length}</span> done`
+        ? `<span style="color:#4ecb8d;font-weight:700">✓ All combinations verified${step.saveBlock ? ` — "${step.saveBlock}" saved to library!` : ' — lesson complete!'}</span>`
+        : `Try each combination on the canvas &nbsp;·&nbsp; <span style="color:var(--text)">${_ls.rowsDone.size}/${rows.length}</span> done${saveNote}`
       }</div>`;
 
     testHtml = `
@@ -267,34 +295,19 @@ function _renderLessonPanel() {
       ${progress}`;
   }
 
-  // Block-save prompt — shows waiting / found state
-  let blockCheckHtml = '';
-  if (step.blockCheck) {
-    const found = blockPassed;
-    blockCheckHtml = `
-      <div style="margin-top:8px;padding:8px 10px;border-radius:4px;
-        border:1px solid ${found ? 'rgba(78,203,141,.4)' : 'var(--border)'};
-        background:${found ? 'rgba(78,203,141,.08)' : 'var(--surface2)'};font-size:10px">
-        ${found
-          ? `<span style="color:#4ecb8d;font-weight:700">✓ Block "${step.blockCheck}" saved — lesson complete!</span>`
-          : `<span style="color:var(--muted)">Waiting for saved block "<b style="color:var(--text)">${step.blockCheck}</b>"…</span>`
-        }
-      </div>`;
-  }
-
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-bottom:10px">
       <span style="font-size:10px;font-weight:700;color:var(--accent);flex:1;
         overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${lesson.title}</span>
       <span style="display:flex;gap:3px;align-items:center">${dots}</span>
-      <button id="lp-close" style="background:none;border:none;color:var(--muted);
-        cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button>
+      <button id="lp-collapse" style="background:none;border:none;color:var(--muted);
+        cursor:pointer;font-size:13px;line-height:1;padding:0 2px" title="Collapse">▼</button>
     </div>
     <div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--muted);
       flex-shrink:0;margin-bottom:5px">${(step.title || '').toUpperCase()}</div>
     <div style="font-size:11px;line-height:1.65;color:var(--text);flex:1;
       overflow-y:auto;white-space:pre-wrap;min-height:0">${step.text || ''}</div>
-    <div style="flex-shrink:0">${testHtml}${blockCheckHtml}</div>
+    <div style="flex-shrink:0">${testHtml}</div>
     <div style="display:flex;align-items:center;gap:6px;margin-top:10px;flex-shrink:0">
       <button id="lp-prev" class="tb-btn" ${isFirst ? 'disabled' : ''}
         style="opacity:${isFirst ? .4 : 1}">← Prev</button>
@@ -307,10 +320,45 @@ function _renderLessonPanel() {
 
   panel.style.display = 'flex';
 
-  document.getElementById('lp-close').addEventListener('click', _closeLessonPanel);
+  document.getElementById('lp-collapse').addEventListener('click', () => {
+    _ls.collapsed = true;
+    _renderLessonPanel();
+  });
   document.getElementById('lp-prev').addEventListener('click', () => { if (!isFirst) _lessonPrev(); });
   document.getElementById('lp-next').addEventListener('click', () => {
     if (!canAdvance) return;
-    if (isLast) _closeLessonPanel(); else _lessonNext();
+    if (isLast) _finishLesson(); else _lessonNext();
   });
 }
+
+// ── Nav hooks ────────────────────────────────────────────────────
+// Wrap switchToCircuit: hide/show lesson panel when the user changes tabs
+const _origSwitchToCircuit = switchToCircuit;
+switchToCircuit = function(cid) {
+  _origSwitchToCircuit(cid);
+  _syncLessonPanelVisibility(cid);
+};
+
+// Wrap closeCircuit: closing the lesson tab truly closes the lesson (with auto-advance)
+const _origCloseCircuit = closeCircuit;
+closeCircuit = function(cid) {
+  if (_ls.lesson && _ls.cid === cid) _closeLessonPanel();
+  _origCloseCircuit(cid);
+};
+
+// ── Restore on page refresh ──────────────────────────────────────
+// Lesson files register after this file runs, so defer until all scripts are loaded.
+setTimeout(() => {
+  if (!currentCircuitId?.startsWith('lesson_')) return;
+  const lessonId = currentCircuitId.replace('lesson_', '');
+  const lesson   = _lessonRegistry.find(l => l.id === lessonId);
+  if (!lesson) return;
+  const done = _lessonDone.has(lesson.id);
+  _ls.lesson     = lesson;
+  _ls.cid        = currentCircuitId;
+  _ls.step       = done ? lesson.steps.length - 1 : 0;
+  _ls.builtSteps = new Set(lesson.steps.map((_, i) => i)); // all steps already built
+  _ls.rowsDone   = new Set();
+  _renderLessonPanel();
+  if (lesson.steps[_ls.step]?.test) _startPoll();
+}, 0);

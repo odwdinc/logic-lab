@@ -23,27 +23,41 @@ The sum column is XOR. The carry column is AND.`,
     },
     {
       title: 'Build the Circuit',
-      text: `The A, B inputs and SUM, CARRY outputs have been placed for you.
+      text: `The circuit has been built for you. A and B each feed both a XOR block and an AND gate:
 
-From the library, drag in:
-  · Your saved XOR block
-  · One AND gate (from the built-in gates)
-
-Wire them up:
   A ──┬── XOR ── SUM
       │
   B ──┤
-      └── AND ── CARRY`,
+      │
+      └── AND ── CARRY
+
+XOR gives the digit you write down. AND gives the digit you carry. Notice: 1+1=2, which in binary is 10 — CARRY=1, SUM=0.`,
       build(cid) {
-        const gA = addNode(cid, 'INPUT',   60,  80, 'A');  gA._value = 0;
-        const gB = addNode(cid, 'INPUT',   60, 200, 'B');  gB._value = 0;
-        addNode(cid, 'OUTPUT', 420,  60, 'SUM');
-        addNode(cid, 'OUTPUT', 420, 220, 'CARRY');
+        const xorDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'XOR');
+        if (!xorDef) return;
+        const xorA   = xorDef.ports.find(p => p.dir==='in'  && p.name==='A')?.id;
+        const xorB   = xorDef.ports.find(p => p.dir==='in'  && p.name==='B')?.id;
+        const xorOut = xorDef.ports.find(p => p.dir==='out')?.id;
+
+        const gA     = addNode(cid, 'INPUT',    60,  80, 'A');  gA._value = 0;
+        const gB     = addNode(cid, 'INPUT',    60, 200, 'B');  gB._value = 0;
+        const gXOR   = addNode(cid, xorDef.id, 250,  60, '');
+        const gAND   = addNode(cid, 'AND',      250, 210, '');
+        const gSum   = addNode(cid, 'OUTPUT',   440,  60, 'SUM');
+        const gCarry = addNode(cid, 'OUTPUT',   440, 210, 'CARRY');
+
+        addWire(cid, gA.id,   'out',   gXOR.id, xorA);
+        addWire(cid, gB.id,   'out',   gXOR.id, xorB);
+        addWire(cid, gA.id,   'out',   gAND.id, 'a');
+        addWire(cid, gB.id,   'out',   gAND.id, 'b');
+        addWire(cid, gXOR.id, xorOut,  gSum.id,   'a');
+        addWire(cid, gAND.id, 'out',   gCarry.id, 'a');
       },
     },
     {
       title: 'Verify the Truth Table',
       text: `Work through all four input combinations. SUM should match XOR, CARRY should match AND.`,
+      saveBlock: 'HALF_ADDER',
       test: {
         inputs:  ['A', 'B'],
         outputs: ['SUM', 'CARRY'],
@@ -54,15 +68,6 @@ Wire them up:
           { in: [1, 1], out: [0, 1] },
         ],
       },
-    },
-    {
-      title: 'Save as Block',
-      text: `The Full Adder lesson chains two of these together. Save it as a block:
-
-1. Select all nodes (drag a selection box around everything)
-2. Right-click any selected node → "Save as Block"
-3. Name it exactly:  HALF_ADDER`,
-      blockCheck: 'HALF_ADDER',
     },
     {
       title: 'Key Insight',

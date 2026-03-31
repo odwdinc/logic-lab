@@ -19,59 +19,63 @@ Carry-out from FA3 → OVF (overflow)`,
     },
     {
       title: 'Build the Circuit',
-      text: `The input and output nodes have been placed for you. You need to add four FULL ADDER blocks and wire them.
+      text: `The circuit has been built for you. Four FULL_ADDER blocks are chained from bit 0 (right) to bit 3 (left). The carry-out of each stage feeds the carry-in of the next.
 
-From the library, drag in four FULL ADDER blocks. Place them left to right for bits 0–3.
+Try adding 3 + 4:
+  A = 0011  (A3=0, A2=0, A1=1, A0=1)
+  B = 0100  (B3=0, B2=1, B1=0, B0=0)
+  Expected: S=0111 (7), OVF=0
 
-Wire each stage:
-  · A0,B0 → FA0 inputs;  FA0 COUT → FA1 CIN
-  · A1,B1 → FA1 inputs;  FA1 COUT → FA2 CIN
-  · A2,B2 → FA2 inputs;  FA2 COUT → FA3 CIN
-  · A3,B3 → FA3 inputs;  FA3 COUT → OVF
-  · Each FA SUM output → its S output node
-  · CIN → FA0 carry-in (tie low: leave unconnected or connect to a 0-valued INPUT)`,
+Then try 15 + 1 to see overflow in action.`,
       build(cid) {
-        // Bit 0 (rightmost)
-        const gA0  = addNode(cid, 'INPUT',  60,  60, 'A0');  gA0._value  = 0;
-        const gB0  = addNode(cid, 'INPUT',  60, 140, 'B0');  gB0._value  = 0;
-        // Bit 1
-        const gA1  = addNode(cid, 'INPUT', 280,  60, 'A1');  gA1._value  = 0;
-        const gB1  = addNode(cid, 'INPUT', 280, 140, 'B1');  gB1._value  = 0;
-        // Bit 2
-        const gA2  = addNode(cid, 'INPUT', 500,  60, 'A2');  gA2._value  = 0;
-        const gB2  = addNode(cid, 'INPUT', 500, 140, 'B2');  gB2._value  = 0;
-        // Bit 3 (leftmost)
-        const gA3  = addNode(cid, 'INPUT', 720,  60, 'A3');  gA3._value  = 0;
-        const gB3  = addNode(cid, 'INPUT', 720, 140, 'B3');  gB3._value  = 0;
-        // Carry-in (tie to 0)
-        const gCin = addNode(cid, 'INPUT',  60, 220, 'CIN'); gCin._value = 0;
+        const faDef  = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'FULL_ADDER');
+        if (!faDef) return;
+        const faA    = faDef.ports.find(p => p.dir==='in'  && p.name==='A')?.id;
+        const faB    = faDef.ports.find(p => p.dir==='in'  && p.name==='B')?.id;
+        const faCin  = faDef.ports.find(p => p.dir==='in'  && p.name==='CIN')?.id;
+        const faSum  = faDef.ports.find(p => p.dir==='out' && p.name==='SUM')?.id;
+        const faCout = faDef.ports.find(p => p.dir==='out' && p.name==='COUT')?.id;
 
-        // Sum outputs
-        addNode(cid, 'OUTPUT',  60, 320, 'S0');
-        addNode(cid, 'OUTPUT', 280, 320, 'S1');
-        addNode(cid, 'OUTPUT', 500, 320, 'S2');
-        addNode(cid, 'OUTPUT', 720, 320, 'S3');
-        // Overflow
-        addNode(cid, 'OUTPUT', 940, 220, 'OVF');
+        const gCin = addNode(cid, 'INPUT', 60, 180, 'CIN'); gCin._value = 0;
+
+        const faNodes = [];
+        for (let i = 0; i < 4; i++) {
+          const x = 240 + i * 310;
+          const gA  = addNode(cid, 'INPUT',    x,  60, `A${i}`); gA._value = 0;
+          const gB  = addNode(cid, 'INPUT',    x, 160, `B${i}`); gB._value = 0;
+          const gFA = addNode(cid, faDef.id,   x, 270, '');
+          const gS  = addNode(cid, 'OUTPUT',   x, 420, `S${i}`);
+          addWire(cid, gA.id,  'out',  gFA.id, faA);
+          addWire(cid, gB.id,  'out',  gFA.id, faB);
+          addWire(cid, gFA.id, faSum,  gS.id,  'a');
+          faNodes.push(gFA);
+        }
+
+        // Chain carries: CIN → FA0, FA0.COUT → FA1.CIN, ...
+        addWire(cid, gCin.id,       'out',   faNodes[0].id, faCin);
+        addWire(cid, faNodes[0].id, faCout,  faNodes[1].id, faCin);
+        addWire(cid, faNodes[1].id, faCout,  faNodes[2].id, faCin);
+        addWire(cid, faNodes[2].id, faCout,  faNodes[3].id, faCin);
+
+        // Overflow output from FA3
+        const gOvf = addNode(cid, 'OUTPUT', 240 + 4 * 310, 270, 'OVF');
+        addWire(cid, faNodes[3].id, faCout, gOvf.id, 'a');
       },
     },
     {
-      title: 'Test: 3 + 4 = 7',
-      text: `Set the inputs for 3 + 4:
-  A = 0011  →  A3=0, A2=0, A1=1, A0=1
-  B = 0100  →  B3=0, B2=1, B1=0, B0=0
-  CIN = 0
+      title: 'Test: Sums and Overflow',
+      text: `Work through three cases: a normal sum, a larger sum, and an overflow.
 
-Expected: S3=0, S2=1, S1=1, S0=1 (binary 0111 = 7), OVF=0`,
+  3 + 4 = 7:   A=0011, B=0100, CIN=0 → S=0111, OVF=0
+  5 + 5 = 10:  A=0101, B=0101, CIN=0 → S=1010, OVF=0
+  15 + 1 = 16: A=1111, B=0001, CIN=0 → S=0000, OVF=1`,
+      saveBlock: 'ALU',
       test: {
         inputs:  ['A3', 'A2', 'A1', 'A0', 'B3', 'B2', 'B1', 'B0', 'CIN'],
         outputs: ['S3', 'S2', 'S1', 'S0', 'OVF'],
         rows: [
-          // 3 + 4 = 7
           { in: [0, 0, 1, 1,  0, 1, 0, 0,  0], out: [0, 1, 1, 1, 0] },
-          // 5 + 5 = 10
           { in: [0, 1, 0, 1,  0, 1, 0, 1,  0], out: [1, 0, 1, 0, 0] },
-          // 15 + 1 = overflow
           { in: [1, 1, 1, 1,  0, 0, 0, 1,  0], out: [0, 0, 0, 0, 1] },
         ],
       },

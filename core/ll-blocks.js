@@ -150,3 +150,44 @@ function openSaveAsBlock(){
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  PROGRAMMATIC SAVE (used by lesson system)
+// ═══════════════════════════════════════════════════════════════
+
+function saveAsBlock(cid, name, color = '#9b59b6') {
+  // Skip if a block with this name already exists
+  if (Object.values(blockDefs).some(d => !d.isBuiltin && d.name === name)) return;
+  const c = circuits[cid];
+  if (!c) return;
+  const inNodes  = Object.values(c.nodes)
+    .filter(n => { const d = blockDefs[n.defId]; return d?.isIO && d.ioDir === 'in'; })
+    .sort((a, b) => a.y - b.y);
+  const outNodes = Object.values(c.nodes)
+    .filter(n => { const d = blockDefs[n.defId]; return d?.isIO && d.ioDir === 'out'; })
+    .sort((a, b) => a.y - b.y);
+  const ports = [];
+  inNodes.forEach((n, i) => {
+    const portId = n._ioPortId || ('p_' + did());
+    ports.push({ id: portId, name: n.label || ('IN' + i), dir: 'in', bits: n._bits || 1 });
+    n._ioPortId = portId;
+  });
+  outNodes.forEach((n, i) => {
+    const portId = n._ioPortId || ('p_' + did());
+    ports.push({ id: portId, name: n.label || ('OUT' + i), dir: 'out', bits: n._bits || 1 });
+    n._ioPortId = portId;
+    if (!n.wireColor) n.wireColor = portWireColor(cid, n.id, 'a') || nextIOColor();
+  });
+  const circClone = {
+    id: 'circ_' + did(), name,
+    nodes: JSON.parse(JSON.stringify(c.nodes)),
+    wires: JSON.parse(JSON.stringify(c.wires))
+  };
+  const defId = name + '_' + did();
+  addDef({ id: defId, name, color, isBuiltin: false, ports, circuit: circClone,
+    logic: inp => simulateCompositeInline(defId, inp) });
+  circuits[circClone.id] = circClone;
+  rebuildLibrary();
+  syncTimers();
+  autosave();
+}
+
+// ═══════════════════════════════════════════════════════════════

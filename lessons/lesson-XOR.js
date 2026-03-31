@@ -18,28 +18,44 @@ Think about it: OR is true when at least one is 1. NAND is false only when both 
     },
     {
       title: 'Build the Circuit',
-      text: `The A, B inputs and OUT output have been placed for you.
+      text: `The circuit has been built for you. Trace the wires:
 
-From the library, drag in:
-  · Your saved OR block
-  · Your saved NAND block
-  · One AND gate (from the built-in gates)
-
-Wire them up:
   A ──┬── OR ───┐
       │          AND ── OUT
-  B ──┤── NAND ─┘
+  B ──┴── NAND ─┘
 
-Both OR and NAND receive A and B. Their outputs feed the AND gate.`,
+Both OR and NAND receive A and B. Their outputs feed the AND gate. Notice how OR and NAND together "vote" — OR passes (0,1) (1,0) AND (1,1), but NAND vetoes (1,1), leaving only the cases where the inputs differ.`,
       build(cid) {
-        const gA = addNode(cid, 'INPUT',   60,  80, 'A');  gA._value = 0;
-        const gB = addNode(cid, 'INPUT',   60, 200, 'B');  gB._value = 0;
-        addNode(cid, 'OUTPUT', 560, 140, 'OUT');
+        const orDef   = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'OR');
+        const nandDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'NAND');
+        if (!orDef || !nandDef) return;
+        const orA    = orDef.ports.find(p => p.dir==='in'  && p.name==='A')?.id;
+        const orB    = orDef.ports.find(p => p.dir==='in'  && p.name==='B')?.id;
+        const orOut  = orDef.ports.find(p => p.dir==='out')?.id;
+        const nandA  = nandDef.ports.find(p => p.dir==='in'  && p.name==='A')?.id;
+        const nandB  = nandDef.ports.find(p => p.dir==='in'  && p.name==='B')?.id;
+        const nandOut = nandDef.ports.find(p => p.dir==='out')?.id;
+
+        const gA    = addNode(cid, 'INPUT',     60,  60, 'A');  gA._value = 0;
+        const gB    = addNode(cid, 'INPUT',     60, 200, 'B');  gB._value = 0;
+        const gOR   = addNode(cid, orDef.id,   240,  60, '');
+        const gNAND = addNode(cid, nandDef.id, 240, 200, '');
+        const gAND  = addNode(cid, 'AND',       420, 130, '');
+        const gOut  = addNode(cid, 'OUTPUT',    580, 130, 'OUT');
+
+        addWire(cid, gA.id,    'out',    gOR.id,   orA);
+        addWire(cid, gB.id,    'out',    gOR.id,   orB);
+        addWire(cid, gA.id,    'out',    gNAND.id, nandA);
+        addWire(cid, gB.id,    'out',    gNAND.id, nandB);
+        addWire(cid, gOR.id,   orOut,    gAND.id,  'a');
+        addWire(cid, gNAND.id, nandOut,  gAND.id,  'b');
+        addWire(cid, gAND.id,  'out',    gOut.id,  'a');
       },
     },
     {
       title: 'Verify the Truth Table',
       text: `XOR outputs 1 only when the inputs differ. When both are 0 or both are 1, the output is 0.`,
+      saveBlock: 'XOR',
       test: {
         inputs:  ['A', 'B'],
         outputs: ['OUT'],
@@ -50,15 +66,6 @@ Both OR and NAND receive A and B. Their outputs feed the AND gate.`,
           { in: [1, 1], out: [0] },
         ],
       },
-    },
-    {
-      title: 'Save as Block',
-      text: `The Half Adder lesson needs this XOR gate. Save it as a block:
-
-1. Select all nodes (drag a selection box around everything)
-2. Right-click any selected node → "Save as Block"
-3. Name it exactly:  XOR`,
-      blockCheck: 'XOR',
     },
     {
       title: 'Key Insight',
