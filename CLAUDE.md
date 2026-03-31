@@ -569,6 +569,64 @@ registerNode({
 
 ---
 
+## Lesson System (`core/ll-lessons.js`)
+
+Lessons are self-contained JS files under `lessons/`. Each calls `registerLesson(desc)`. No core file changes are needed to add a lesson.
+
+### Lesson descriptor
+```js
+registerLesson({
+  id:       'AND_Gates',         // unique key, stored in localStorage on completion
+  title:    'Lesson 1 · ...',    // shown in picker and panel header
+  requires: [],                  // lesson IDs that must be done first (locks this lesson)
+
+  steps: [
+    // Concept / text step — just prose
+    { title: 'Concept', text: '...' },
+
+    // Build step — runs once when the step is first reached (skipped on revisit)
+    {
+      title: 'Build the Circuit',
+      text:  '...',
+      build(cid) {
+        const gA = addNode(cid, 'INPUT', 60, 60, 'A');
+        // ... addNode / addWire calls
+      },
+    },
+
+    // Test step — shows a truth table; Next is blocked until Check passes
+    {
+      title: 'Verify the Truth Table',
+      text:  '...',
+      test: {
+        inputs:  ['A', 'B'],   // INPUT node labels to drive
+        outputs: ['OUT'],      // OUTPUT node labels to read
+        rows: [
+          { in: [0, 0], out: [0] },
+          { in: [0, 1], out: [0] },
+          { in: [1, 0], out: [0] },
+          { in: [1, 1], out: [1] },
+        ],
+      },
+    },
+  ],
+});
+```
+
+### Lesson flow
+1. **Picker** (`openLessonPicker()`) — shows all lessons with ○ / ✓ / 🔒 status. Locked lessons are greyed out until their prerequisites are complete.
+2. **Open** (`openLesson(id)`) — creates a fresh isolated circuit (`lesson_<id>`), switches to it, shows the floating panel.
+3. **Steps** — Prev/Next navigate between steps. `build()` runs once the first time its step is reached (not re-run on revisit, not run on Prev).
+4. **Test step** — "Check Truth Table" button sets each input combination, simulates, reads OUTPUT port values, and compares to expected. On full pass the lesson is marked done in localStorage and Next unlocks.
+5. **Completion** — `_lessonDone` (Set) persisted under `ll_lessons_done` in localStorage.
+
+### Adding a new lesson
+1. Create `lessons/lesson-MYNAME.js` with a `registerLesson({...})` call.
+2. Add `<script src="lessons/lesson-MYNAME.js"></script>` to `index.html` after `core/ll-lessons.js`.
+3. Nothing else changes.
+
+---
+
 ## Block Editing
 
 Custom blocks are created via "Save as Block" (right-click menu). Entering a block for editing sets:
