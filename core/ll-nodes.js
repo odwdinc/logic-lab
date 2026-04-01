@@ -130,3 +130,33 @@ function descDrawThumbnail(g, node, def) {
   const desc = _nodeRegistry[def.id];
   if (desc?.drawThumbnail) desc.drawThumbnail(g, node, def);
 }
+
+// Dynamic wire-drop port resolution — lets nodes (e.g. bus wire) create ports on the fly.
+// forDrop=true means the user actually released the wire here; false = hover preview only.
+// Returns {node, portId, pp} or null.
+function descResolveWireDrop(wx, wy, node, cid, forDrop) {
+  const desc = _nodeRegistry[node.defId];
+  if (!desc?.resolveWireDrop) return null;
+  return desc.resolveWireDrop(wx, wy, node, cid, forDrop);
+}
+
+// Custom node hit-test — returns true/false, or null to fall back to bbox.
+function descHitNode(wx, wy, node) {
+  const desc = _nodeRegistry[node?.defId];
+  if (!desc?.hitTest) return null;
+  return desc.hitTest(wx, wy, node);
+}
+
+// Waypoint handle hit-test for selected node — returns handle-like object or null.
+function descHitWaypoint(wx, wy, node) {
+  const desc = _nodeRegistry[node?.defId];
+  if (!desc?.hitWaypoint) return null;
+  return desc.hitWaypoint(wx, wy, node);
+}
+
+// Double-click on node — descriptor can handle it; return true to consume.
+function descDblClick(wx, wy, node, cid) {
+  const desc = _nodeRegistry[node?.defId];
+  if (!desc?.onDblClick) return false;
+  return desc.onDblClick(wx, wy, node, cid);
+}

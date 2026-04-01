@@ -29,6 +29,10 @@ canvas.addEventListener('mousedown',e=>{
     const g=nodeGeom(n);
     dragMode='resize'; dragNodeId=selNodeId; resizeHandle=rh;
     resizeSnap={mx:wx,my:wy,nx:n.x,ny:n.y,nw:g.w,nh:g.h};
+    // Store initial waypoint position for waypoint-drag handles
+    if(rh._wpIdx!==undefined && n._pts?.[rh._wpIdx]){
+      resizeSnap._wpX=n._pts[rh._wpIdx].x; resizeSnap._wpY=n._pts[rh._wpIdx].y;
+    }
     canvas.style.cursor=rh.cur; return;
   }
 
@@ -155,7 +159,7 @@ canvas.addEventListener('mouseup',e=>{
   if(dragMode==='wire'&&wireStart){
     const {cx,cy}=getXY(e);
     const {x:wx,y:wy}=c2w(cx,cy);
-    const ph=hitPort(wx,wy);
+    const ph=hitPort(wx,wy,true);
     if(ph&&ph.node.id!==wireStart.nodeId){
       const fnId=wireStart.nodeId,fpId=wireStart.portId;
       const tnId=ph.node.id,tpId=ph.portId;
@@ -191,6 +195,7 @@ canvas.addEventListener('dblclick',e=>{
   const {x:wx,y:wy}=c2w(cx,cy);
   const n=hitNode(wx,wy);
   if(n){
+    if(descDblClick(wx,wy,n,currentCircuitId)) return;
     const def=blockDefs[n.defId];
     if(def?.circuit) enterBlock(n.defId, n.id, currentCircuitId);
     else if(def?.isIO){

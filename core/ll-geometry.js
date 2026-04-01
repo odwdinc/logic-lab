@@ -70,7 +70,7 @@ function portWorldPos(node,portId){
   const def=blockDefs[node.defId];
   let tx=g.x+p.x, ty=g.y+p.y;
   // Only 1-bit gate ports have a stub; multi-bit ports connect at the node edge
-  if(!def?.isIO && p.bits===1){
+  if(!def?.isIO && p.bits===1 && !p.noStub){
     if(p.dir==='in')  tx=g.x+p.x-STUB_LEN;
     else              tx=g.x+p.x+STUB_LEN;
   }
