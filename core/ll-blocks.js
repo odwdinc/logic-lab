@@ -66,6 +66,65 @@ document.getElementById('canvas-wrap').addEventListener('drop',e=>{
   libDrag=null; updatePropPanel();
 });
 
+// ── Touch drag from library panel to canvas ───────────────────
+// Finger starts on a lib-item; dragging over canvas and releasing places the node.
+(function(){
+  let _libTouchDefId=null, _libTouchId=null, _libGhost=null;
+
+  function _removeGhost(){
+    if(_libGhost){_libGhost.remove();_libGhost=null;}
+  }
+
+  document.getElementById('block-library').addEventListener('touchstart',e=>{
+    const it=e.target.closest('.lib-item'); if(!it) return;
+    e.preventDefault();
+    _libTouchDefId=it.dataset.defId;
+    _libTouchId=e.touches[0].identifier;
+    // Create a floating ghost label that follows the finger
+    _removeGhost();
+    _libGhost=document.createElement('div');
+    _libGhost.textContent=it.querySelector('.lib-badge')?.textContent||it.textContent.trim().slice(0,12);
+    Object.assign(_libGhost.style,{
+      position:'fixed',pointerEvents:'none',zIndex:9999,
+      background:'var(--surface2)',border:'1px solid var(--border2)',
+      borderRadius:'4px',padding:'4px 8px',fontSize:'11px',fontWeight:'600',
+      color:'var(--text)',opacity:'0.92',transform:'translate(-50%,-150%)',
+      left:e.touches[0].clientX+'px',top:e.touches[0].clientY+'px',
+    });
+    document.body.appendChild(_libGhost);
+  },{passive:false});
+
+  document.addEventListener('touchmove',e=>{
+    if(_libTouchDefId===null) return;
+    for(const t of e.touches){
+      if(t.identifier!==_libTouchId) continue;
+      if(_libGhost){ _libGhost.style.left=t.clientX+'px'; _libGhost.style.top=t.clientY+'px'; }
+      break;
+    }
+  },{passive:true});
+
+  document.addEventListener('touchend',e=>{
+    if(_libTouchDefId===null) return;
+    for(const t of e.changedTouches){
+      if(t.identifier!==_libTouchId) continue;
+      _removeGhost();
+      const r=canvas.getBoundingClientRect();
+      const cx=t.clientX-r.left, cy=t.clientY-r.top;
+      if(cx>=0&&cy>=0&&cx<=r.width&&cy<=r.height){
+        const {x,y}=c2w(cx,cy);
+        addNode(currentCircuitId,_libTouchDefId,Math.round(x/10)*10,Math.round(y/10)*10);
+        updatePropPanel();
+      }
+      _libTouchDefId=null; _libTouchId=null;
+      break;
+    }
+  },{passive:true});
+
+  document.addEventListener('touchcancel',e=>{
+    _removeGhost(); _libTouchDefId=null; _libTouchId=null;
+  },{passive:true});
+})();
+
 // ═══════════════════════════════════════════════════════════════
 //  SAVE AS BLOCK
 // ═══════════════════════════════════════════════════════════════

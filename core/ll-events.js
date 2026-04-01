@@ -220,3 +220,115 @@ canvas.addEventListener('contextmenu',e=>{
 });
 
 // ═══════════════════════════════════════════════════════════════
+//  TOUCH SUPPORT
+//  Single finger → left-click drag (select / move / wire)
+//  Two fingers   → pinch-to-zoom + pan
+//  Double-tap    → double-click
+// ═══════════════════════════════════════════════════════════════
+
+(function(){
+  let _pinchDist0=null, _pinchScale0=1;
+  let _pinchMidX=0, _pinchMidY=0, _pinchVpX=0, _pinchVpY=0;
+  let _lastTapT=0, _lastTapX=0, _lastTapY=0;
+  let _longPressTimer=null, _longPressT=null;
+  const LONG_PRESS_MS=600, LONG_PRESS_MOVE=10;
+
+  function _mm(type,t,extra={}){
+    return new MouseEvent(type,{bubbles:true,cancelable:true,clientX:t.clientX,clientY:t.clientY,...extra});
+  }
+  function _cancelLongPress(){
+    if(_longPressTimer){clearTimeout(_longPressTimer);_longPressTimer=null;}
+    _longPressT=null;
+  }
+
+  canvas.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    if(e.touches.length===1 && _pinchDist0===null){
+      const t=e.touches[0];
+      canvas.dispatchEvent(_mm('mousedown',t,{button:0}));
+      // Start long-press timer for context menu
+      _cancelLongPress();
+      _longPressT=t;
+      _longPressTimer=setTimeout(()=>{
+        _longPressTimer=null;
+        // Cancel the ongoing drag so it doesn't interfere
+        canvas.dispatchEvent(new MouseEvent('mouseleave',{bubbles:true}));
+        canvas.dispatchEvent(new MouseEvent('contextmenu',{
+          bubbles:true,cancelable:true,
+          clientX:_longPressT.clientX,clientY:_longPressT.clientY
+        }));
+        _longPressT=null;
+      },LONG_PRESS_MS);
+    } else if(e.touches.length===2){
+      _cancelLongPress();
+      // Cancel any in-progress single-touch interaction
+      canvas.dispatchEvent(new MouseEvent('mouseleave',{bubbles:true}));
+      const t0=e.touches[0],t1=e.touches[1];
+      const dx=t1.clientX-t0.clientX, dy=t1.clientY-t0.clientY;
+      _pinchDist0=Math.sqrt(dx*dx+dy*dy);
+      _pinchScale0=vpScale;
+      const r=canvas.getBoundingClientRect();
+      _pinchMidX=(t0.clientX+t1.clientX)/2-r.left;
+      _pinchMidY=(t0.clientY+t1.clientY)/2-r.top;
+      _pinchVpX=vpX; _pinchVpY=vpY;
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    if(e.touches.length===1 && _pinchDist0===null){
+      const t=e.touches[0];
+      // Cancel long-press if finger moved significantly
+      if(_longPressT && (Math.abs(t.clientX-_longPressT.clientX)>LONG_PRESS_MOVE ||
+                         Math.abs(t.clientY-_longPressT.clientY)>LONG_PRESS_MOVE)){
+        _cancelLongPress();
+      }
+      canvas.dispatchEvent(_mm('mousemove',t));
+    } else if(e.touches.length===2 && _pinchDist0!==null){
+      const t0=e.touches[0],t1=e.touches[1];
+      const dx=t1.clientX-t0.clientX, dy=t1.clientY-t0.clientY;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      const r=canvas.getBoundingClientRect();
+      const midX=(t0.clientX+t1.clientX)/2-r.left;
+      const midY=(t0.clientY+t1.clientY)/2-r.top;
+      const newScale=Math.max(0.15,Math.min(3,_pinchScale0*dist/_pinchDist0));
+      // Keep the world point under the initial pinch centre anchored
+      const wbx=_pinchVpX+_pinchMidX/_pinchScale0;
+      const wby=_pinchVpY+_pinchMidY/_pinchScale0;
+      vpScale=newScale;
+      vpX=wbx-midX/newScale;
+      vpY=wby-midY/newScale;
+      render();
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchend',e=>{
+    e.preventDefault();
+    _cancelLongPress();
+    if(e.touches.length===0){
+      if(_pinchDist0===null && e.changedTouches.length){
+        const t=e.changedTouches[0];
+        canvas.dispatchEvent(_mm('mouseup',t,{button:0}));
+        // Double-tap → dblclick
+        const now=Date.now();
+        if(now-_lastTapT<300 && Math.abs(t.clientX-_lastTapX)<20 && Math.abs(t.clientY-_lastTapY)<20){
+          canvas.dispatchEvent(_mm('dblclick',t));
+          _lastTapT=0;
+        } else {
+          _lastTapT=now; _lastTapX=t.clientX; _lastTapY=t.clientY;
+        }
+      }
+      _pinchDist0=null;
+    } else if(e.touches.length===1){
+      // Dropped from 2 fingers to 1 — end pinch without starting a drag
+      _pinchDist0=null;
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchcancel',e=>{
+    _cancelLongPress();
+    _pinchDist0=null;
+    canvas.dispatchEvent(new MouseEvent('mouseleave',{bubbles:true}));
+  },{passive:false});
+})();
+
