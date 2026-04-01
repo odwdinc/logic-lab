@@ -147,80 +147,87 @@ function portLaneColors(cid, nodeId, portId){
   const c=circuits[cid]; if(!c) return [null];
   const n=c.nodes[nodeId]; if(!n) return [null];
   const def=blockDefs[n.defId];
-  // Cycle guard — same set as gateOutputColor, cleared each render()
-  const key=cid+'|'+nodeId+'|'+portId;
+  // Cycle guard — blocks re-entry during active recursion (feedback loops).
+  // Uses 'plc:' prefix to avoid colliding with gateOutputColor's keys, which
+  // share the same nodeId|portId format but must be allowed to run independently.
+  // Key is deleted before returning so later independent queries in the same
+  // frame are not blocked.
+  const key='plc:'+cid+'|'+nodeId+'|'+portId;
   if(_colorVisited.has(key)) return [null];
   _colorVisited.add(key);
+
+  let result;
 
   // INPUT node — use per-lane colors if available, else uniform wireColor
   if(def?.isIO&&def.ioDir==='in'){
     const bits=n._bits||1;
-    if(n._laneColors&&n._laneColors.length===bits) return [...n._laneColors];
-    return Array(bits).fill(n.wireColor||null);
+    result = (n._laneColors&&n._laneColors.length===bits)
+      ? [...n._laneColors]
+      : Array(bits).fill(n.wireColor||null);
   }
 
   // OUTPUT node (top-level) — trace from incoming wire
-  if(def?.isIO&&def.ioDir==='out'){
+  else if(def?.isIO&&def.ioDir==='out'){
     const fromWire=Object.values(c.wires).find(w=>w.toNode===nodeId&&w.toPort==='a');
-    if(!fromWire) return [null];
-    return portLaneColors(cid,fromWire.fromNode,fromWire.fromPort);
+    result = fromWire ? portLaneColors(cid,fromWire.fromNode,fromWire.fromPort) : [null];
   }
 
   // BITS_TO_BUS 'bus' output — lane[0]=MSB=b(bits-1), lane[bits-1]=LSB=b0
-  if(def?.id==='BITS_TO_BUS' && portId==='bus'){
+  else if(def?.id==='BITS_TO_BUS' && portId==='bus'){
     const bits=n._bits||2;
-    // Lane i (MSB first) corresponds to b(bits-1-i)
-    return Array.from({length:bits},(_,i)=>wireSourceColors(cid,n.id,'b'+(bits-1-i))[0]||null);
+    result = Array.from({length:bits},(_,i)=>wireSourceColors(cid,n.id,'b'+(bits-1-i))[0]||null);
   }
 
   // BUS_TO_BITS individual bit outputs — b(i) carries lane bits-1-i (MSB-first lanes)
-  if(def?.id==='BUS_TO_BITS' && portId!=='bus'){
+  else if(def?.id==='BUS_TO_BITS' && portId!=='bus'){
     const fromWire=Object.values(c.wires).find(w=>w.toNode===nodeId&&w.toPort==='bus');
-    if(!fromWire) return [null];
-    const lanes=portLaneColors(cid,fromWire.fromNode,fromWire.fromPort);
-    const bits=n._bits||2;
-    const bitIdx=parseInt(portId.slice(1)); // b0=LSB, b(bits-1)=MSB
-    const laneIdx=bits-1-bitIdx;            // lane 0=MSB, lane bits-1=LSB
-    return [lanes[laneIdx]||null];
-  }
-
-  // For an output port on any other node — compute based on gate type
-  const portDef=getNodePorts(n,def).find(p=>p.id===portId);
-  if(portDef?.dir==='out'){
-    // Composite block — do full per-lane trace through internal circuit
-    if(def.circuit){
-      const ic=circuits[def.circuit.id]||def.circuit;
-      const outIONode=ic?Object.values(ic.nodes).find(nd=>nd._ioPortId===portId):null;
-      if(outIONode){
-        // Set external lane colors on internal INPUT nodes temporarily
-        const saved={};
-        def.ports.filter(p=>p.dir==='in').forEach(p=>{
-          const inIONode=Object.values(ic.nodes).find(nd=>nd._ioPortId===p.id);
-          if(!inIONode) return;
-          const lanes=portLaneColors(cid,nodeId,p.id);
-          saved[inIONode.id]={wc:inIONode.wireColor,lc:inIONode._laneColors};
-          inIONode.wireColor=lanes.find(c=>c)||inIONode.wireColor;
-          inIONode._laneColors=lanes.length>1?lanes:undefined;
-        });
-        const blockCid=def.circuit.id;
-        const result=portLaneColors(blockCid,outIONode.id,'a');
-        // Restore
-        Object.entries(saved).forEach(([nid,s])=>{
-          const nd=ic.nodes[nid]; if(!nd) return;
-          nd.wireColor=s.wc; nd._laneColors=s.lc;
-        });
-        return result;
-      }
+    if(!fromWire){ result=[null]; }
+    else{
+      const lanes=portLaneColors(cid,fromWire.fromNode,fromWire.fromPort);
+      const bits=n._bits||2;
+      const bitIdx=parseInt(portId.slice(1));
+      result=[lanes[bits-1-bitIdx]||null];
     }
-    const col=gateOutputColor(cid,n,def,portId);
-    const bits=portDef.bits||1;
-    return Array(bits).fill(col||null);
   }
 
-  // Input port — trace from the wire feeding it
-  const fromWire=Object.values(c.wires).find(w=>w.toNode===nodeId&&w.toPort===portId);
-  if(!fromWire) return [null];
-  return portLaneColors(cid,fromWire.fromNode,fromWire.fromPort);
+  else {
+    const portDef=getNodePorts(n,def).find(p=>p.id===portId);
+    if(portDef?.dir==='out'){
+      // Composite block — full per-lane trace through internal circuit
+      if(def.circuit){
+        const ic=circuits[def.circuit.id]||def.circuit;
+        const outIONode=ic?Object.values(ic.nodes).find(nd=>nd._ioPortId===portId):null;
+        if(outIONode){
+          const saved={};
+          def.ports.filter(p=>p.dir==='in').forEach(p=>{
+            const inIONode=Object.values(ic.nodes).find(nd=>nd._ioPortId===p.id);
+            if(!inIONode) return;
+            const lanes=portLaneColors(cid,nodeId,p.id);
+            saved[inIONode.id]={wc:inIONode.wireColor,lc:inIONode._laneColors};
+            inIONode.wireColor=lanes.find(c=>c)||inIONode.wireColor;
+            inIONode._laneColors=lanes.length>1?lanes:undefined;
+          });
+          const blockCid=def.circuit.id;
+          result=portLaneColors(blockCid,outIONode.id,'a');
+          Object.entries(saved).forEach(([nid,s])=>{
+            const nd=ic.nodes[nid]; if(!nd) return;
+            nd.wireColor=s.wc; nd._laneColors=s.lc;
+          });
+        }
+      }
+      if(!result){
+        const col=gateOutputColor(cid,n,def,portId);
+        result=Array(portDef.bits||1).fill(col||null);
+      }
+    } else {
+      // Input port — trace from the wire feeding it
+      const fromWire=Object.values(c.wires).find(w=>w.toNode===nodeId&&w.toPort===portId);
+      result = fromWire ? portLaneColors(cid,fromWire.fromNode,fromWire.fromPort) : [null];
+    }
+  }
+
+  _colorVisited.delete(key);
+  return result ?? [null];
 }
 
 // Returns the effective port list for a node — handles dynamic IO and BTB ports
