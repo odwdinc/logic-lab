@@ -22,7 +22,8 @@ Logic Lab is a browser-based logic circuit editor. It runs entirely from static 
 │   ├── node-ROM.js     — ROM; fmtRomCell; buildRomTableHTML; refreshRomTable; demo()
 │   ├── node-DISPLAY.js — 7-SEG; SEG_MAP; draw7Seg; demo()
 │   ├── node-ANALYZER.js — ANALYZER; _analyzerTimers; syncAnalyzerTimers; drawAnalyzer; demo()
-│   └── node-IO-WEB.js — WEB_INPUT example; _webTimers; polls a URL and drives a bus output
+│   ├── node-IO-WEB.js — WEB_INPUT example; _webTimers; polls a URL and drives a bus output
+│   └── node-BUSW.js   — BUS_WIRE; shared tri-state bus line; path helpers; ribbon drawing
 │
 └── core/               — Engine files (no node-type knowledge)
     ├── ll-nodes.js     — Node registry: registerNode, runDemos, all descriptor hook dispatchers
@@ -32,9 +33,9 @@ Logic Lab is a browser-based logic circuit editor. It runs entirely from static 
     ├── ll-geometry.js  — nodeGeom(), portWorldPos(), ioNodeW/H, port constants
     ├── ll-canvas.js    — Canvas element, viewport state, coordinate transforms, selection state
     ├── ll-render.js    — render(), drawWire(), drawBusWire(), drawNode(), collectThumbnailNodes()
-    ├── ll-resize.js    — Resize handles, hitResizeHandle(), applyResize(), drawResizeHandles()
-    ├── ll-events.js    — Mouse/touch event handlers, hitNode(), hitPort(), hitWire()
-    ├── ll-blocks.js    — Context menu, library drag, openSaveAsBlock(), rebuildLibrary()
+    ├── ll-resize.js    — Resize handles, hitResizeHandle(), applyResize(), drawResizeHandles(), hitNode(), hitPort(), hitWire()
+    ├── ll-events.js    — Mouse + touch event handlers; single-finger drag, pinch-zoom, double-tap, long-press→context menu
+    ├── ll-blocks.js    — Context menu, library drag (mouse + touch), openSaveAsBlock(), rebuildLibrary()
     ├── ll-nav.js       — Circuit tabs, enterBlock(), commitBlockUpdate(), clearLiveInputFeeds()
     ├── ll-props.js     — Properties panel HTML, patchPropPanelLive(), refreshRamTable()
     └── ll-core.js      — Save/load, keyboard, modal, toast, loadDemo(), init(), autosave()
@@ -144,7 +145,8 @@ registerNode({
   defaultBits: 4,
 
   // Static port list (used if getPorts not defined)
-  ports: [{ id, name, dir:'in'|'out', bits }],
+  // noStub:true suppresses the STUB_LEN offset on 1-bit ports (used by BUS_WIRE taps)
+  ports: [{ id, name, dir:'in'|'out', bits, noStub }],
 
   // Dynamic port list (overrides static ports)
   getPorts(node) → [{ id, name, dir, bits }],
@@ -201,6 +203,25 @@ registerNode({
   // Used by descClickCell() on mousedown; replaces hardcoded bit-toggle logic
   clickCell(node, wx, wy, cid) → boolean,
 
+  // Custom node hit-test — return true/false, or null to fall back to bbox
+  // false = inside bbox but not on the shape (keeps scanning other nodes)
+  hitTest(wx, wy, node) → boolean|null,
+
+  // Dynamic wire-drop port resolution — lets nodes create ports on the fly when a wire is dropped.
+  // forDrop=false = hover preview only (return a preview port without mutating state)
+  // forDrop=true  = wire was actually released here (create the tap and return it)
+  // Only called during an active wire drag (wireStart is non-null).
+  // Returns {node, portId, pp} or null.
+  resolveWireDrop(wx, wy, node, cid, forDrop) → {node, portId, pp}|null,
+
+  // Waypoint handle hit-test — return a resize-handle-like object when near a draggable waypoint,
+  // or null. Object must have { id, cur, _wpIdx } so applyResize can identify it.
+  // Called by descHitWaypoint() before the standard RESIZE_HANDLES loop.
+  hitWaypoint(wx, wy, node) → {id, cur, _wpIdx}|null,
+
+  // Double-click handler — return true to consume the event (skip block-enter / rename logic)
+  onDblClick(wx, wy, node, cid) → boolean,
+
   // Demo circuit builder — called by runDemos() during loadDemo()
   demo() { makeCircuit(...); addNode(...); addWire(...); },
 });
@@ -226,6 +247,10 @@ registerNode({
 | `getDescPropsHTML(node, def, bits)` | `updatePropPanel()` | Returns `desc.getPropsHTML()` |
 | `bindDescProps(node, def, cid)` | `updatePropPanel()` | Calls `desc.bindProps()` |
 | `patchDescLive(node, def)` | `patchPropPanelLive()` | Calls `desc.patchLive()` |
+| `descHitNode(wx, wy, node)` | `hitNode()` | Calls `desc.hitTest()`; false skips node even if inside bbox |
+| `descResolveWireDrop(wx, wy, node, cid, forDrop)` | `hitPort()` | Calls `desc.resolveWireDrop()` after fixed-port scan |
+| `descHitWaypoint(wx, wy, node)` | `hitResizeHandle()` | Calls `desc.hitWaypoint()` before standard handle loop |
+| `descDblClick(wx, wy, node, cid)` | `dblclick` handler | Calls `desc.onDblClick()`; true consumes the event |
 
 ---
 
@@ -338,6 +363,79 @@ laneIdx = srcBits - 1 - (bits - 1 - b)  // for grid cell b
 
 ---
 
+## BUS_WIRE Node (`node-BUSW.js`)
+
+A routable shared tri-state bus line. Unlike regular nodes it has no fixed body — it is a polyline of waypoints that any number of other nodes can tap into.
+
+### Concepts
+- **Waypoints** (`node._pts`) — array of `{x,y}` world coords. First point is always at `(node.x, node.y)`. Minimum 2 points.
+- **Taps** (`node._taps`) — array of `{id, t, dir}`. `t` is a 0–1 fraction along the total path length. `dir:'in'` = writer (drives the bus); `dir:'out'` = reader (receives bus value).
+- **Tri-state resolution** — exactly one writer tap may be active at a time. If two writer taps carry different values, `node._conflict = true` and all reader taps receive `null`.
+
+### Path math helpers (module-level)
+| Function | Purpose |
+|---|---|
+| `_bwSyncPts(node)` | Shifts all `_pts` by the delta between `node.x/y` and `_pts[0]` — called at the start of every operation to reconcile engine-driven node movement |
+| `_bwPathInfo(pts)` | Returns `{segs, total}` — segment array with cumulative start distances, plus total path length |
+| `_bwPtAtT(pts, info, t)` | World position at fraction `t` along the path |
+| `_bwNearestT(pts, info, wx, wy)` | `{t, dist}` — nearest point on the path to `(wx,wy)` |
+| `_bwOffsetPolyline(pts, off)` | Offset polyline for a lane — miter-join intersection at interior waypoints |
+
+### Drawing helpers (module-level)
+| Function | Purpose |
+|---|---|
+| `_bwDrawRibbonBackground(pts, bits)` | Jacket + body as a single continuous polyline (`lineJoin:'round'`) — no cap artifacts at waypoints |
+| `_bwDrawLanes(pts, bits, val, srcColor, laneColors)` | Per-lane offset polylines as continuous strokes — connected at corners via miter math |
+
+### Adding / removing taps
+Wires connect to the bus via `resolveWireDrop`. When a wire drag hovers over the bus, a preview port `tap_preview` is returned without mutating state. On actual drop, a new tap is created with an auto-incremented `_tapNext` ID. Taps are removed by deleting the connected wire and calling "Clear all taps" in the props panel.
+
+### Waypoint editing
+- **Drag waypoint handle** (when selected) → `hitWaypoint` returns `{id:'wp_N', _wpIdx:N}`; `applyResize` moves `_pts[N]`
+- **Double-click on waypoint** → removes it (minimum 2 points kept)
+- **Double-click on path** → inserts a new waypoint at that position
+- `resizeSnap._wpX/_wpY` stores the waypoint's world position at drag start so `applyResize` can apply the delta correctly
+
+### Restore safety
+`initNode` is not called on restore. Every function that reads `_pts` or `_taps` guards with:
+```js
+if (!node._pts?.length) node._pts = [{ x: node.x, y: node.y }, { x: node.x + 200, y: node.y }];
+if (!node._taps)    node._taps    = [];
+if (!node._tapNext) node._tapNext = 0;
+```
+
+---
+
+## Mobile / Touch Support (`ll-events.js`, `ll-blocks.js`)
+
+Touch events are translated to the existing mouse-event logic. The canvas has `touch-action: none` (CSS) so the browser never intercepts events for scrolling.
+
+### Canvas gestures
+| Gesture | Behaviour |
+|---|---|
+| 1-finger tap | Select node / start wire / deselect |
+| 1-finger drag | Move node / drag wire / rubber-band select |
+| 1-finger long-press (600 ms, < 10 px movement) | Opens context menu (delete, rename, etc.) |
+| Double-tap | Double-click — enters block, renames IO, adds/removes bus waypoints |
+| 2-finger drag | Pan viewport |
+| 2-finger pinch / spread | Zoom — anchored to the initial pinch centre |
+
+### Implementation (IIFE in `ll-events.js`)
+- `touchstart` (1 finger) → `mousedown`; starts long-press timer
+- `touchmove` (1 finger) → `mousemove`; cancels long-press if movement > threshold
+- `touchend` (1 finger) → `mouseup`; double-tap detection compares time + position to previous tap
+- `touchstart` (2 fingers) → dispatches `mouseleave` to cancel drag; records pinch state
+- `touchmove` (2 fingers) → directly updates `vpScale`/`vpX`/`vpY` without dispatching mouse events
+- `touchcancel` → dispatches `mouseleave` to reset all drag state
+- Dropping from 2 → 1 finger ends pinch cleanly without starting a new single-touch drag
+
+### Library touch-drag (IIFE in `ll-blocks.js`)
+- `touchstart` on a `.lib-item` → records `defId`, shows a floating ghost label
+- `touchmove` (document) → moves the ghost label with the finger
+- `touchend` (document) → if finger lifted over the canvas rect, calls `addNode()` at that position; otherwise cancels
+
+---
+
 ## Geometry
 
 ### Constants (`ll-geometry.js`)
@@ -358,7 +456,7 @@ STUB_LEN = 18   1-bit gate port stub length
 2. Fall through to default: compute from `def.ports`, `NLH`, `NPY`, `NPS`
 
 ### Port world position
-`portWorldPos(node, portId)` adds STUB_LEN offset for 1-bit gate ports (not IO ports, not multi-bit).
+`portWorldPos(node, portId)` adds STUB_LEN offset for 1-bit gate ports (not IO ports, not multi-bit, not `noStub:true`).
 
 ---
 
@@ -618,7 +716,15 @@ registerLesson({
 2. **Open** (`openLesson(id)`) — creates a fresh isolated circuit (`lesson_<id>`), switches to it, shows the floating panel.
 3. **Steps** — Prev/Next navigate between steps. `build()` runs once the first time its step is reached (not re-run on revisit, not run on Prev).
 4. **Test step** — "Check Truth Table" button sets each input combination, simulates, reads OUTPUT port values, and compares to expected. On full pass the lesson is marked done in localStorage and Next unlocks.
-5. **Completion** — `_lessonDone` (Set) persisted under `ll_lessons_done` in localStorage.
+5. **Completion** — Pressing "Done" on the last step calls `_finishLesson()`, which marks the lesson complete in localStorage and auto-advances to the next unlocked lesson (closing the old lesson circuit tab). `_lessonDone` (Set) persisted under `ll_lessons_done` in localStorage.
+
+### Lesson panel behaviour
+- The panel is **hidden on page load** (`display:none`). It only appears when a lesson is active.
+- The panel has a **collapse/expand toggle** (not a close button). Collapsing hides the step content but keeps the lesson active.
+- **Tab switching**: switching to a non-lesson circuit hides the panel without clearing lesson state. Switching back to the lesson circuit restores it.
+- **Closing the lesson tab**: calls `_closeLessonPanel()` — clears lesson state, hides panel. Does NOT auto-advance.
+- **Page refresh restore**: `ll-lessons.js` uses a `setTimeout(..., 0)` defer at startup to check if `currentCircuitId` starts with `lesson_` and restores the panel if so.
+- `switchToCircuit` and `closeCircuit` in `ll-nav.js` are monkey-patched at the bottom of `ll-lessons.js` to keep panel visibility in sync without modifying core nav files.
 
 ### Adding a new lesson
 1. Create `lessons/lesson-MYNAME.js` with a `registerLesson({...})` call.
@@ -649,4 +755,7 @@ Custom blocks are created via "Save as Block" (right-click menu). Entering a blo
 - **Node IDs** — `n{N}`, wire IDs `w{N}`, def IDs `d{N}` from monotonic counters `_nid/_wid/_did`
 - **`excludeFromSnapshot`** — IO, clock, analyzer, display nodes set this flag so `simulateCompositeInline` doesn't clobber their live state during inline evaluation
 - **`initNode` is not called on restore** — any field that draw or logic reads must have a fallback (`?? default`) in case the node was restored from localStorage before the field existed
+- **`noStub: true` port flag** — suppresses the STUB_LEN tip offset in both `portWorldPos` and `hitPort`; used by BUS_WIRE taps so wire endpoints land on the path rather than beside it
+- **`resolveWireDrop` only fires during a wire drag** — implementations must guard with `if (!wireStart) return null` to avoid intercepting regular click/hover events
+- **`resizeSnap` is passed whole to `descApplyResize`** — the full object (including `_wpX/_wpY` stored at drag start) is forwarded so descriptor resize handlers can apply deltas correctly
 - **Node files are optional** — any `nodes/node-*.js` can be removed from `index.html` without crashing the engine; its features simply become unavailable

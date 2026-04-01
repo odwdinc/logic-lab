@@ -15,13 +15,16 @@ Logic Lab lets you design and simulate digital logic circuits in real time:
 - **Wire them up** — drag from any output port to any input port; wires route themselves
 - **See it live** — the circuit simulates on every change; signal values update instantly
 - **Multi-bit buses** — scale any I/O node from 1 to 8 bits; ribbon wires show each lane in its own color
+- **Shared bus wire** — a routable tri-state bus line; tap any number of writers and readers anywhere along it; supports 1–8 bits with full ribbon rendering
 - **Clocks** — configurable square-wave oscillators (0.001–50 Hz) drive sequential logic
 - **7-segment displays** — visualise BCD values with up to 3 digits, signed or unsigned
 - **ROM** — 256×16 memory with an interactive table; read from cells directly
 - **Logic analyser** — capture up to 1024 samples across 8 channels, triggered or free-running; export as CSV
 - **Custom blocks** — select any sub-circuit, save it as a reusable block, and drag instances from the library
 - **Multi-select** — rubber-band select a group of nodes and move them together
+- **Lessons** — built-in interactive lessons walk through logic concepts step by step, with circuit builders and auto-checked truth tables
 - **Autosave** — your work is saved to browser storage automatically and restored on next open
+- **Mobile friendly** — full touch support; single-finger interact, two-finger pan and pinch-to-zoom, long-press for context menu
 
 ---
 
@@ -57,6 +60,18 @@ Most logic simulators require installation, a specific OS, or a paid licence. Lo
 | Zoom | Scroll wheel |
 | Enter a custom block | Double-click it |
 | Save | Ctrl/Cmd+S, or autosaved every 1.5 s |
+
+### Touch controls (mobile)
+
+| Gesture | Action |
+|---|---|
+| Tap | Select / place wire end / deselect |
+| Drag | Move node / draw wire / rubber-band select |
+| Long-press (hold ~0.6 s) | Context menu — delete, rename, etc. |
+| Double-tap | Enter block / rename IO node |
+| Two-finger drag | Pan |
+| Pinch / spread | Zoom |
+| Drag library item to canvas | Place node |
 
 ---
 
