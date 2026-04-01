@@ -22,16 +22,12 @@ Work through the four cases:
 The sum column is XOR. The carry column is AND.`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. A and B each feed both a XOR block and an AND gate:
-
-  A ──┬── XOR ── SUM
-      │
-  B ──┤
-      │
-      └── AND ── CARRY
-
-XOR gives the digit you write down. AND gives the digit you carry. Notice: 1+1=2, which in binary is 10 — CARRY=1, SUM=0.`,
+      title: 'Test the Circuit',
+      text: `A and B each feed both a XOR block and an AND gate: 
+  XOR gives the digit you write down. 
+  AND gives the digit you carry.
+ 
+Notice: 1+1=2, which in binary is 10 — CARRY=1, SUM=0.`,
       build(cid) {
         const xorDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'XOR');
         if (!xorDef) return;

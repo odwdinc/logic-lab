@@ -24,7 +24,7 @@ Binary digit:   1   1   0   1  =  8+4+0+1  =  13`,
 4 bits gives 16 possible values (0–15). Every extra bit doubles the range. 8 bits → 256. 16 bits → 65,536. This is why storage sizes are all powers of 2.`,
     },
     {
-      title: 'Build the Circuit',
+      title: 'Test the Circuit',
       text: `A 4-bit INPUT node is connected to a 4-bit OUTPUT node. The INPUT shows bits b3 b2 b1 b0 from left to right (MSB to LSB). Click individual bit cells to toggle them and read the binary value.
 Try setting:  5 = 0101,  10 = 1010,  13 = 1101`,
       build(cid) {
@@ -34,9 +34,9 @@ Try setting:  5 = 0101,  10 = 1010,  13 = 1101`,
       },
     },
     {
-      title: 'Verify: Decimal 5',
-      text: `Set the INPUT to binary 5 (0101). Bit pattern: b3=0, b2=1, b1=0, b0=1.
-Value = 0×8 + 1×4 + 0×2 + 1×1 = 5.`,
+      title: 'Verify: Decimal',
+      text: `Set the INPUT to binary. 
+Value = b3×8 + b2×4 + b1×2 + b0×1.`,
       test: {
         inputs:  ['IN'],
         outputs: ['OUT'],

@@ -10,16 +10,16 @@ registerLesson({
       title: 'Concept',
       text: `Connect four full adders in a chain. Each adder handles one bit position. The carry-out of each adder feeds into the carry-in of the next one to the left — this is called "ripple carry."
 
-Bit position:   3          2          1          0
-             [FA3] ←c  [FA2] ←c  [FA1] ←c  [FA0] ← CIN=0
+Bit position:  3          2          1          0
+             [FA3] ←c   [FA2] ←c   [FA1] ←c   [FA0] ← CIN=0
 A inputs:     A3         A2         A1         A0
 B inputs:     B3         B2         B1         B0
 Sum outputs:  S3         S2         S1         S0
 Carry-out from FA3 → OVF (overflow)`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. Four FULL_ADDER blocks are chained from bit 0 (right) to bit 3 (left). The carry-out of each stage feeds the carry-in of the next.
+      title: 'Test the Circuit',
+      text: `Four FULL_ADDER blocks are chained from bit 0 (right) to bit 3 (left). The carry-out of each stage feeds the carry-in of the next.
 
 Try adding 3 + 4:
   A = 0011  (A3=0, A2=0, A1=1, A0=1)
@@ -36,18 +36,27 @@ Then try 15 + 1 to see overflow in action.`,
         const faSum  = faDef.ports.find(p => p.dir==='out' && p.name==='SUM')?.id;
         const faCout = faDef.ports.find(p => p.dir==='out' && p.name==='COUT')?.id;
 
-        const gCin = addNode(cid, 'INPUT', 60, 180, 'CIN'); gCin._value = 0;
+        const gCin = addNode(cid, 'INPUT', -90, 350, 'CIN'); gCin._value = 0;
+
+        const gA  = addNode(cid, 'INPUT',  -90, 100, 'IN-A'); gA._bits  = 4; gA._value  = 0;
+        const gB  = addNode(cid, 'INPUT',  -90, 250, 'IN-B'); gB._bits  = 4; gB._value  = 0;
+        const bA  = addNode(cid, 'BUS_TO_BITS',  40, 45, 'A-Bits');   bA._bits  = 4;
+        const bB  = addNode(cid, 'BUS_TO_BITS',  40, 200, 'B-Bits');   bB._bits  = 4;
+        addWire(cid, gA.id, 'out', bA.id, 'bus');
+        addWire(cid, gB.id, 'out', bB.id, 'bus');
+
+        const gS  = addNode(cid, 'OUTPUT',  1600, 200, 'OUT-S');   gS._bits  = 4;
+        const bS  = addNode(cid, 'BITS_TO_BUS',  1400, 100, 'S-Bits');   bS._bits  = 4;
+        addWire(cid, bS.id, 'bus', gS.id, 'a',);
+
 
         const faNodes = [];
         for (let i = 0; i < 4; i++) {
           const x = 240 + i * 310;
-          const gA  = addNode(cid, 'INPUT',    x,  60, `A${i}`); gA._value = 0;
-          const gB  = addNode(cid, 'INPUT',    x, 160, `B${i}`); gB._value = 0;
           const gFA = addNode(cid, faDef.id,   x, 270, '');
-          const gS  = addNode(cid, 'OUTPUT',   x, 420, `S${i}`);
-          addWire(cid, gA.id,  'out',  gFA.id, faA);
-          addWire(cid, gB.id,  'out',  gFA.id, faB);
-          addWire(cid, gFA.id, faSum,  gS.id,  'a');
+          addWire(cid, bA.id,  `b${i}`,  gFA.id, faA);
+          addWire(cid, bB.id,  `b${i}`,  gFA.id, faB);
+          addWire(cid, gFA.id, faSum,  bS.id,  `b${i}`);
           faNodes.push(gFA);
         }
 
@@ -71,12 +80,12 @@ Then try 15 + 1 to see overflow in action.`,
   15 + 1 = 16: A=1111, B=0001, CIN=0 → S=0000, OVF=1`,
       saveBlock: 'ALU',
       test: {
-        inputs:  ['A3', 'A2', 'A1', 'A0', 'B3', 'B2', 'B1', 'B0', 'CIN'],
-        outputs: ['S3', 'S2', 'S1', 'S0', 'OVF'],
+        inputs:  ['IN-A', 'IN-B', 'CIN'],
+        outputs: ['OUT-S', 'OVF'],
         rows: [
-          { in: [0, 0, 1, 1,  0, 1, 0, 0,  0], out: [0, 1, 1, 1, 0] },
-          { in: [0, 1, 0, 1,  0, 1, 0, 1,  0], out: [1, 0, 1, 0, 0] },
-          { in: [1, 1, 1, 1,  0, 0, 0, 1,  0], out: [0, 0, 0, 0, 1] },
+          { in: [3,  4,  0], out: [7, 0] },
+          { in: [5,  5,  0], out: [10, 0] },
+          { in: [15, 1,  0], out: [0, 1] },
         ],
       },
     },

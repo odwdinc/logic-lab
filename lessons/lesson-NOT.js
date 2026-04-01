@@ -15,7 +15,7 @@ registerLesson({
       text: `The NOT gate is the simplest possible logic operation. A transistor is essentially a NOT gate — that's the fundamental trick that makes electronics programmable. Electricity controlling electricity.`,
     },
     {
-      title: 'Build the Circuit',
+      title: 'Test the Circuit',
       text: `One input A feeds a NOT gate, whose output connects to OUT. Notice the output starts ON before you touch anything — the default input is 0, which gets inverted to 1. Try clicking A to toggle it.`,
       build(cid) {
         const gA   = addNode(cid, 'INPUT',  60,  90, 'A');   gA._value = 0;

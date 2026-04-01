@@ -198,7 +198,7 @@ function openSaveAsBlock(){
     };
     const defId=name+'_'+did();
     addDef({id:defId,name,color,isBuiltin:false,ports,circuit:circClone,
-      logic:(inp)=>simulateCompositeInline(defId,inp)});
+      logic:(inp,inst)=>simulateCompositeInline(defId,inp,inst)});
     circuits[circClone.id]=circClone;
     rebuildLibrary();
     toast(`"${name}" saved — drag from library to use`);
@@ -242,7 +242,7 @@ function saveAsBlock(cid, name, color = '#9b59b6') {
   };
   const defId = name + '_' + did();
   addDef({ id: defId, name, color, isBuiltin: false, ports, circuit: circClone,
-    logic: inp => simulateCompositeInline(defId, inp) });
+    logic: (inp,inst) => simulateCompositeInline(defId, inp, inst) });
   circuits[circClone.id] = circClone;
   rebuildLibrary();
   syncTimers();

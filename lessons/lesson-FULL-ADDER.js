@@ -18,16 +18,11 @@ Build it by chaining two half-adder stages:
   COUT = OR(carry1, carry2)`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. Two HALF_ADDER blocks are chained, with an OR block combining their carry outputs:
+      title: 'Test the Circuit',
+      text: `Two HALF_ADDER blocks are chained, with an OR block combining their carry outputs.
 
-  A ─┐
-     [HA1]─ partial_sum ─┐
-  B ─┘   └─ carry1 ─┐    [HA2]─ SUM
-                     │CIN─┘   └─ carry2 ─┐
-                     └────────────────── OR ── COUT
-
-Trace the carry path: carry1 OR carry2 goes high whenever two or more inputs (A, B, CIN) are 1.`,
+Trace the carry path: 
+  carry1 OR carry2 goes high whenever two or more inputs (A, B, CIN) are 1.`,
       build(cid) {
         const haDef  = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'HALF_ADDER');
         const orDef  = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'OR');

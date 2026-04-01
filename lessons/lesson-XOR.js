@@ -17,14 +17,8 @@ The formula using gates you already have:
 Think about it: OR is true when at least one is 1. NAND is false only when both are 1. AND-ing them together excludes the both-1 case.`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. Trace the wires:
-
-  A ──┬── OR ───┐
-      │          AND ── OUT
-  B ──┴── NAND ─┘
-
-Both OR and NAND receive A and B. Their outputs feed the AND gate. Notice how OR and NAND together "vote" — OR passes (0,1) (1,0) AND (1,1), but NAND vetoes (1,1), leaving only the cases where the inputs differ.`,
+      title: 'Test the Circuit',
+      text: `Both OR and NAND receive A and B. Their outputs feed the AND gate. Notice how OR and NAND together "vote" — OR passes (0,1) (1,0) AND (1,1), but NAND vetoes (1,1), leaving only the cases where the inputs differ.`,
       build(cid) {
         const orDef   = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'OR');
         const nandDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'NAND');
@@ -69,7 +63,9 @@ Both OR and NAND receive A and B. Their outputs feed the AND gate. Notice how OR
     },
     {
       title: 'Key Insight',
-      text: `XOR detects difference. Two inputs that are the same → 0. Two inputs that differ → 1.
+      text: `XOR detects difference. 
+Two inputs that are the same → 0. 
+Two inputs that differ → 1.
 
 Compare XOR to OR:
   OR  outputs 1 for (0,1), (1,0), and (1,1)

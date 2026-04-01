@@ -11,7 +11,6 @@ const _ls = {
   lesson:     null,
   cid:        null,
   step:       0,
-  builtSteps: new Set(),
   rowsDone:   new Set(),   // indices of test rows the user has reproduced
   pollTimer:  null,
   collapsed:  false,
@@ -139,11 +138,10 @@ function openLesson(lessonId) {
   if (circuits[cid]) delete circuits[cid];
   makeCircuit(cid, lesson.title);
 
-  _ls.lesson     = lesson;
-  _ls.cid        = cid;
-  _ls.step       = 0;
-  _ls.builtSteps = new Set();
-  _ls.rowsDone   = new Set();
+  _ls.lesson   = lesson;
+  _ls.cid      = cid;
+  _ls.step     = 0;
+  _ls.rowsDone = new Set();
 
   switchToCircuit(cid);
   _runStepAction();
@@ -155,11 +153,40 @@ function openLesson(lessonId) {
 function _runStepAction() {
   const step = _ls.lesson?.steps[_ls.step];
   if (step?.test) _startPoll();
-  if (!step?.build || _ls.builtSteps.has(_ls.step)) return;
-  _ls.builtSteps.add(_ls.step);
-  step.build(_ls.cid);
-  simulate(_ls.cid);
-  setTimeout(fitView, 50);
+  if (!step?.build) return;
+
+  // Clear existing lesson circuit before rebuilding so every navigation to a
+  // build step always shows a fresh, correct circuit.
+  const c = circuits[_ls.cid];
+  if (c) {
+    Object.values(c.nodes).forEach(n => {
+      const def = blockDefs[n.defId];
+      if (def) nodeRemovedHook(n, def, _ls.cid);
+    });
+    c.nodes = {};
+    c.wires = {};
+  }
+
+  // Show spinner and yield one frame so the browser can paint it before
+  // the (potentially heavy) build runs synchronously.
+  const panel = document.getElementById('lesson-panel');
+  const spinner = document.createElement('div');
+  spinner.id = 'lesson-build-spinner';
+  Object.assign(spinner.style, {
+    position:'absolute', inset:'0', display:'flex', alignItems:'center',
+    justifyContent:'center', background:'rgba(10,12,16,0.75)',
+    borderRadius:'6px', zIndex:'10', fontSize:'12px', color:'var(--muted)',
+    letterSpacing:'.08em', fontFamily:'var(--font)',
+  });
+  spinner.textContent = 'Building…';
+  panel.appendChild(spinner);
+
+  setTimeout(() => {
+    beginBatchBuild();
+    try { step.build(_ls.cid); } finally { endBatchBuild(_ls.cid); }
+    spinner.remove();
+    setTimeout(fitView, 50);
+  }, 16);
 }
 
 function _lessonNext() {
@@ -179,9 +206,7 @@ function _lessonPrev() {
   _ls.step--;
   _ls.rowsDone = new Set();
   _renderLessonPanel();
-  // Don't re-run build on going back; do restart poll if returning to a test step
-  const step = _ls.lesson.steps[_ls.step];
-  if (step?.test) _startPoll();
+  _runStepAction();
 }
 
 function _closeLessonPanel() {
@@ -354,11 +379,10 @@ setTimeout(() => {
   const lesson   = _lessonRegistry.find(l => l.id === lessonId);
   if (!lesson) return;
   const done = _lessonDone.has(lesson.id);
-  _ls.lesson     = lesson;
-  _ls.cid        = currentCircuitId;
-  _ls.step       = done ? lesson.steps.length - 1 : 0;
-  _ls.builtSteps = new Set(lesson.steps.map((_, i) => i)); // all steps already built
-  _ls.rowsDone   = new Set();
+  _ls.lesson   = lesson;
+  _ls.cid      = currentCircuitId;
+  _ls.step     = done ? lesson.steps.length - 1 : 0;
+  _ls.rowsDone = new Set();
   _renderLessonPanel();
-  if (lesson.steps[_ls.step]?.test) _startPoll();
+  _runStepAction();
 }, 0);

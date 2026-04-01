@@ -147,6 +147,10 @@ function portLaneColors(cid, nodeId, portId){
   const c=circuits[cid]; if(!c) return [null];
   const n=c.nodes[nodeId]; if(!n) return [null];
   const def=blockDefs[n.defId];
+  // Cycle guard — same set as gateOutputColor, cleared each render()
+  const key=cid+'|'+nodeId+'|'+portId;
+  if(_colorVisited.has(key)) return [null];
+  _colorVisited.add(key);
 
   // INPUT node — use per-lane colors if available, else uniform wireColor
   if(def?.isIO&&def.ioDir==='in'){

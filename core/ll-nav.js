@@ -266,7 +266,7 @@ function commitBlockUpdate(){
   def.ports=newPorts;
   def.circuit=circuits[c.id]||c; // live reference, not a clone
   // Rebuild logic fn
-  def.logic=(inp)=>simulateCompositeInline(defId,inp);
+  def.logic=(inp,inst)=>simulateCompositeInline(defId,inp,inst);
 
   // ── Propagate: find every use of this block across all circuits and re-simulate ──
   // Any circuit containing a node of this defId needs fresh port value maps

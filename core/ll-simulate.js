@@ -59,32 +59,55 @@ function simulate(cid, quiet=false){
   }
 }
 
-function simulateCompositeInline(defId,inputMap){
+function simulateCompositeInline(defId, inputMap, inst){
   const def=blockDefs[defId]; if(!def) return {};
   const c=circuits[def.circuit?.id]||def.circuit; if(!c) return {};
 
-  // Snapshot gate nodes only — nodes with excludeFromSnapshot flag are skipped.
-  // IO, clock, analyzer, and display nodes register this via their descriptor flags.
-  const snap={};
-  Object.values(c.nodes).forEach(n=>{
-    const nd=blockDefs[n.defId];
-    if(nd?.excludeFromSnapshot) return;
-    snap[n.id]={pv:{...n.portValues},v:n._value};
+  // Gate nodes are the internal combinational/sequential nodes — IO, clock, etc.
+  // are excluded via excludeFromSnapshot flag.  Their portValues hold the latch state.
+  const gateNodes=Object.values(c.nodes).filter(n=>!blockDefs[n.defId]?.excludeFromSnapshot);
+
+  // Per-instance state: each block node (inst) carries its own copy of gate
+  // portValues (and nested _blockState for composite sub-nodes) in _blockState.
+  // Load it into the shared circuit before running so two instances of the same
+  // block never contaminate each other — including arbitrarily nested blocks.
+  if(inst){
+    if(!inst._blockState) inst._blockState={};
+    for(const gn of gateNodes){
+      const saved=inst._blockState[gn.id];
+      if(saved){
+        gn.portValues={...saved.pv};
+        // Restore nested composite block state so inner latches are also isolated
+        if(saved.bs!==undefined) gn._blockState=JSON.parse(JSON.stringify(saved.bs));
+      } else {
+        // Fresh instance — start every port at null (neutral)
+        const nd=blockDefs[gn.defId];
+        const ports=getNodePorts(gn,nd);
+        gn.portValues={};
+        ports.forEach(p=>{ gn.portValues[p.id]=null; });
+        gn._blockState={};
+      }
+    }
+  }
+
+  // Save _value of INPUT IO nodes we are about to drive so display stays correct
+  const savedInputs={};
+  def.ports.filter(p=>p.dir==='in').forEach(p=>{
+    const ion=Object.values(c.nodes).find(n=>n._ioPortId===p.id);
+    if(ion) savedInputs[ion.id]={v:ion._value};
   });
 
-  // Feed inputs — preserve null for unconnected/floating ports
+  // Feed inputs
   def.ports.filter(p=>p.dir==='in').forEach(p=>{
     const ion=Object.values(c.nodes).find(n=>n._ioPortId===p.id);
     if(ion){
       const v=inputMap[p.id]??null;
-      // Only set _value if we have a real value — null means floating, leave as-is
       if(v!==null) ion._value=v;
       ion.portValues['out']=v;
     }
   });
 
-  // Run propagation only (don't call simulate() which would clobber live clock state)
-  // Do a simple propagation pass: wires → gate logic, no global reset
+  // Run propagation: wires → gate logic, no global reset
   let changed=true;
   for(let iter=0;iter<64&&changed;iter++){
     changed=false;
@@ -107,18 +130,26 @@ function simulateCompositeInline(defId,inputMap){
     });
   }
 
-  // Collect outputs — read live portValues from OUTPUT IO nodes
+  // Save updated gate state (and nested _blockState) back into this instance
+  if(inst){
+    for(const gn of gateNodes){
+      const entry={pv:{...gn.portValues}};
+      // If this node is itself a composite block, persist its inner state too
+      if(gn._blockState!==undefined) entry.bs=JSON.parse(JSON.stringify(gn._blockState));
+      inst._blockState[gn.id]=entry;
+    }
+  }
+
+  // Collect outputs
   const result={};
   def.ports.filter(p=>p.dir==='out').forEach(p=>{
     const ion=Object.values(c.nodes).find(n=>n._ioPortId===p.id);
     if(ion) result[p.id]=ion.portValues['a']??null;
   });
 
-  // Restore snapshotted nodes, preserving _phase/_hz (clock state)
-  Object.values(c.nodes).forEach(n=>{
-    if(!snap[n.id]) return;
-    n.portValues=snap[n.id].pv;
-    n._value=snap[n.id].v;
+  // Restore _value on INPUT IO nodes so their display is not stale
+  Object.entries(savedInputs).forEach(([nid,s])=>{
+    const n=c.nodes[nid]; if(n) n._value=s.v;
   });
 
   return result;

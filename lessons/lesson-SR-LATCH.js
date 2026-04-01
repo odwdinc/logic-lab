@@ -15,15 +15,8 @@ An SR Latch has two inputs: SET and RESET. Pulse SET and the output turns on. Re
 The trick is feedback: the output is fed back as one of the inputs. Once the output is on, it keeps itself on even after SET is removed.`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. Trace the wires:
-
-  SET ─────────── OR ──── AND ── Q
-                  │         │
-  RESET ── NOT ──┘    ┌────┘  ← feedback
-                       └──────────────┘
-
-Try clicking SET on the canvas. The output turns on. Now release SET (click it back to 0). The output stays on — the AND gate is kept high by its own output through the feedback wire.
+      title: 'Test the Circuit',
+      text: `Try clicking SET on the canvas. The output turns on. Now release SET (click it back to 0). The output stays on — the AND gate is kept high by its own output through the feedback wire.
 
 Click RESET to clear. Then release RESET — it stays cleared.`,
       build(cid) {

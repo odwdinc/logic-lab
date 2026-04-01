@@ -20,16 +20,13 @@ The circuit adds AND gate control in front of a NOR SR latch:
   RESET = NOT(DATA) AND STORE`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. Trace the signal path:
-
-  DATA ────────── AND1 ─── SET ───┐
-      └── NOT ─── AND2 ─── RESET ─┤
-  STORE ──────────┘               │
-                           NOR SR latch → Q
-
-When STORE=0: both AND gates output 0 → SET=0, RESET=0 → latch holds.
-When STORE=1: DATA controls SET; NOT(DATA) controls RESET.`,
+      title: 'Test the Circuit',
+      text: `Trace the signal path:
+When STORE=0: 
+ Both AND gates output 0 → SET=0, RESET=0 → latch holds.
+      
+When STORE=1: 
+ DATA controls SET; NOT(DATA) controls RESET.`,
       build(cid) {
         const norDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'NOR');
         if (!norDef) return;

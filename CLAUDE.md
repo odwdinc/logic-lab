@@ -263,13 +263,14 @@ registerNode({
 4. `quiet=true` (timer ticks): calls `patchPropPanelLive()` only — never rebuilds props panel HTML
 5. `quiet=false` (user actions): calls `updatePropPanelIfSafe()` + `autosaveDebounced()`
 
-### `simulateCompositeInline(defId, inputMap)`
-Used when evaluating a custom block as a black box from outside.
-- Snapshots all non-`excludeFromSnapshot` nodes
+### `simulateCompositeInline(defId, inputMap, inst)`
+Used when evaluating a custom block as a black box from outside. `inst` is the node instance calling in (passed from the `logic` closure).
+- Loads this instance's saved gate state (`inst._blockState`) into the shared circuit so multiple instances of the same block don't contaminate each other
 - Feeds `inputMap` into INPUT IO nodes
 - Runs propagation (no global reset)
+- Saves updated gate state back to `inst._blockState` (preserves latch/flip-flop state per instance)
 - Reads OUTPUT IO node values
-- Restores snapshot
+- Restores INPUT IO `_value` so their display is not stale
 
 ### Null / floating signal rules
 - `null` = floating / high-Z
@@ -750,7 +751,7 @@ Custom blocks are created via "Save as Block" (right-click menu). Entering a blo
 
 - **One driver per input port** — `addWire()` removes any existing wire to the same `toNode`/`toPort` before adding
 - **Feedback loops** — output ports retain their previous value between simulate iterations as the seed; iteration limit is 256
-- **Custom block logic** — stored as `simulateCompositeInline(defId, inp)` closure, stripped from JSON on save, re-attached on restore
+- **Custom block logic** — stored as `(inp,inst)=>simulateCompositeInline(defId,inp,inst)` closure, stripped from JSON on save, re-attached on restore; `inst` is the node instance so each placed copy maintains independent state in `inst._blockState`
 - **`main` circuit** — always exists, created by `init()`, cannot be closed
 - **Node IDs** — `n{N}`, wire IDs `w{N}`, def IDs `d{N}` from monotonic counters `_nid/_wid/_did`
 - **`excludeFromSnapshot`** — IO, clock, analyzer, display nodes set this flag so `simulateCompositeInline` doesn't clobber their live state during inline evaluation

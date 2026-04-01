@@ -13,7 +13,7 @@ registerLesson({
 The NAND gate is famously "universal" — every other logic gate can be built from NANDs alone. Entire CPUs have been designed using only NAND gates.`,
     },
     {
-      title: 'Build the Circuit',
+      title: 'Test the Circuit',
       text: `A and B feed an AND gate. The AND output feeds a NOT gate, whose output connects to OUT. This is your first composed gate — built from two simpler ones.`,
       build(cid) {
         const gA   = addNode(cid, 'INPUT',   60,  60, 'A');   gA._value = 0;

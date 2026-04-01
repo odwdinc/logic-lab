@@ -8,33 +8,38 @@ registerLesson({
   steps: [
     {
       title: 'Why Build It From NAND?',
-      text: `The NOR-based D Latch you built is logically correct, but it mixes NOR gates (custom blocks) with AND and NOT gates. In real hardware — specifically, on a breadboard with 74-series chips — you often only have one type of gate chip available.
+      text: `The D Latch you built works correctly, but it uses a mix of different gate types (NOR, AND, and NOT). In real hardware like building a circuit on a breadboard this is inconvenient, because you'd need multiple different chip packages.
 
-NAND is the most common and cheapest gate chip. Since NAND is universal, you can build the entire D Latch from NAND gates alone. This is exactly what the script did on the breadboard.
+NAND gates are the most common and cheapest option. Better yet, NAND is a "universal" gate, meaning you can recreate any other logic gate using only NANDs. So instead of mixing gate types, we can build the entire D Latch using nothing but NAND gates.
 
-The structure uses 5 NAND gates:
-  1 — NAND(DATA, DATA)         = NOT(DATA)
-  2 — NAND(DATA, STORE)        = S̄  (active-low SET)
-  3 — NAND(NOT_DATA, STORE)    = R̄  (active-low RESET)
-  4,5 — NAND SR latch (active-low SR latch)`,
+This NAND-only version uses 5 gates total:
+  1 — NAND(DATA, DATA): Inverts DATA (acts like NOT)
+  2 — NAND(DATA, STORE): Produces S̄, the "Set" signal
+  3 — NAND(NOT_DATA, STORE): Produces the "Reset" signal
+  4 & 5 — Form the SR latch core: Stores the output`,
     },
     {
       title: 'NAND SR Latch',
-      text: `The NAND SR latch uses active-low inputs: the output Q goes high when S̄ goes LOW, and resets when R̄ goes LOW.
+      text: `The SR latch is the "memory" core of the D Latch it's the part that actually holds a 0 or 1. It's built from two NAND gates whose outputs feed back into each other:
+  
+  4: NAND(S̄, Q̄) → produces Q
+  5: NAND(R̄, Q) → produces Q̄
 
-  NAND1(S̄, Q̄) = Q
-  NAND2(R̄, Q)  = Q̄
+The bar over S̄ and R̄ means they are "active-low" they trigger when the signal goes LOW (0), not high.
 
-When S̄=0 (SET active): NAND1 output forced to 1 = Q ✓
-When R̄=0 (RESET active): NAND2 output forced to 1 = Q̄, so Q=0 ✓
-When S̄=1, R̄=1 (hold): each output locks the other through feedback.
-
-The gate generating S̄ and R̄:
-  S̄ = NAND(DATA, STORE)         → low when DATA=1 AND STORE=1 (SET)
-  R̄ = NAND(NOT_DATA, STORE)     → low when DATA=0 AND STORE=1 (RESET)`,
+Here's what happens in each case:
+  Set:
+    Gate 4 is forced high → Q becomes 1
+    (latch stores a 1)
+  Reset:
+    Gate 5 is forced high → Q̄ becomes 1
+    so Q becomes 0 (latch stores a 0)
+  Hold:
+    Neither gate is forced the outputs lock 
+each other in place, remembering the last value.`,
     },
     {
-      title: 'Build the Circuit',
+      title: 'Test the Circuit',
       text: `The full NAND-only D Latch has been assembled for you. It uses 5 NAND blocks wired as:
 
   Gate 1: NAND(DATA, DATA)    → NOT_DATA
@@ -105,9 +110,9 @@ Verify it behaves identically to the NOR-based D Latch. The outputs of Gate 4 = 
     },
     {
       title: 'Key Insight',
-      text: `"NAD chips" from the script — that is exactly what these are: 74HC00 quad NAND gate ICs. By using a chip that contains four NAND gates, and a second chip for the remaining one, you can build a complete D Latch on a breadboard with no other components except resistors for the LEDs.
+      text: `With 2 74HC00 quad NAND gate ICs; a chip that contains four NAND gates. you can build a complete D Latch on a breadboard with no other components except resistors for the LEDs.
 
-This is why NAND is called universal: any logic function, including memory, can be built using only NAND gates. That makes it economical — one chip type, bought in bulk, used everywhere.`,
+This is why NAND is called universal: any logic function, including memory, can be built using only NAND gates. That makes it economical, one chip type, bought in bulk, used everywhere.`,
     },
   ],
 });

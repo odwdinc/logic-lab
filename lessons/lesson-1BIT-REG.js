@@ -19,17 +19,11 @@ This is a 2-to-1 multiplexer:
 The mux: AND(DATA, STORE) OR AND(Q, NOT_STORE)`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit is assembled for you:
-
-  DATA ─── AND1 ──┐
-  STORE ───┘       OR ── D_FLIP_FLOP.DATA
-  NOT(STORE) ─── AND2 ──┘               D_FLIP_FLOP.Q ── OUTPUT Q
-  Q ─────────────┘                                    └── AND2 (feedback)
-  CLK ─── D_FLIP_FLOP.CLK
-
-When STORE=0: AND1=0, AND2=Q, OR=Q → flip-flop sees its own output → holds.
-When STORE=1: AND1=DATA, AND2=0, OR=DATA → flip-flop captures DATA on next rising edge.`,
+      title: 'Test the Circuit',
+      text: `When STORE=0: AND1=0, AND2=Q, OR=Q 
+  flip-flop sees its own output → holds.
+When STORE=1: AND1=DATA, AND2=0, OR=DATA
+  flip-flop captures DATA on next rising edge.`,
       build(cid) {
         const ffDef  = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'D_FLIP_FLOP');
         const orDef  = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'OR');
@@ -47,8 +41,8 @@ When STORE=1: AND1=DATA, AND2=0, OR=DATA → flip-flop captures DATA on next ris
         const gStore = addNode(cid, 'INPUT',   60, 310, 'STORE'); gStore._value = 0;
 
         const gNot   = addNode(cid, 'NOT',     240, 310, '');   // NOT(STORE)
-        const gAnd1  = addNode(cid, 'AND',     400,  60, '');   // DATA AND STORE
-        const gAnd2  = addNode(cid, 'AND',     400, 240, '');   // Q AND NOT_STORE
+        const gAnd1  = addNode(cid, 'AND',     400,  60, 'AND1');   // DATA AND STORE
+        const gAnd2  = addNode(cid, 'AND',     400, 240, 'AND2');   // Q AND NOT_STORE
         const gOr    = addNode(cid, orDef.id,  580, 150, '');   // mux output
         const gFF    = addNode(cid, ffDef.id,  760, 120, '');   // D Flip-Flop
         const gQ     = addNode(cid, 'OUTPUT',  980,  80, 'Q');
@@ -79,10 +73,15 @@ When STORE=1: AND1=DATA, AND2=0, OR=DATA → flip-flop captures DATA on next ris
     {
       title: 'Verify the Register',
       text: `Work through this sequence to verify STORE gating:
-1. Set DATA=1, STORE=1. Click CLK high → Q=1.
-2. Change DATA=0, STORE=0. Click CLK high → Q should STAY at 1 (STORE is off).
-3. Click CLK low (setup for next test).
-4. Set STORE=1. Click CLK high → Q=0 (now DATA=0 is captured).`,
+
+1. Set DATA=1, STORE=1. 
+  Click CLK high → Q=1, Click CLK low.
+
+2. Change DATA=0, STORE=0. 
+  Click CLK high → Q should STAY at 1 (STORE is off).
+  Click CLK low.
+
+3. Set STORE=1. Click CLK high → Q=0 (now DATA=0 is captured).`,
       saveBlock: 'REG_1BIT',
       test: {
         inputs:  ['DATA', 'CLK', 'STORE'],
@@ -98,11 +97,7 @@ When STORE=1: AND1=DATA, AND2=0, OR=DATA → flip-flop captures DATA on next ris
     },
     {
       title: 'Key Insight',
-      text: `This is the defect the script describes (and fixes): the simpler approach — AND-ing STORE with the clock — has a glitch. If STORE changes state while CLK is high, the flip-flop sees a spurious rising edge and stores the wrong value.
-
-The multiplexer approach avoids this entirely: the clock is never modified. The mux only controls what DATA the flip-flop sees. The edge-trigger does the rest.
-
-This is a 1-bit register. The CPU in your phone has thousands of these, organised into a register file. Together they form the small, ultra-fast scratch space the processor uses while running your code.`,
+      text: `This is a 1-bit register. The CPU in your phone has thousands of these, organised into a register file. Together they form the small, ultra-fast scratch space the processor uses while running your code.`,
     },
   ],
 });

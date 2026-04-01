@@ -16,8 +16,8 @@ registerLesson({
     },
 
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. Two inputs A and B feed an AND gate, whose output connects to the OUT node. Try clicking A or B on the canvas to toggle them and observe the output.`,
+      title: 'Test the Circuit',
+      text: `Two inputs A and B feed an AND gate, whose output connects to the OUT node. Try clicking A or B on the canvas to toggle them and observe the output.`,
       build(cid) {
         const gA   = addNode(cid, 'INPUT',   60,  60, 'A');   gA._value = 0;
         const gB   = addNode(cid, 'INPUT',   60, 150, 'B');   gB._value = 0;

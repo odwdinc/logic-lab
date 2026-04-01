@@ -19,12 +19,8 @@ Truth table:
 NOR (like NAND) is a universal gate — you can build any logic function from NOR gates alone. It also happens to make a beautifully simple SR latch — two NOR gates, each feeding back into the other.`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit wires your OR block through a NOT gate:
-
-  A ──┐
-      OR ── NOT ── OUT
-  B ──┘`,
+      title: 'Test the Circuit',
+      text: `The circuit wires your OR block through a NOT gate.`,
       build(cid) {
         const orDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'OR');
         if (!orDef) return;

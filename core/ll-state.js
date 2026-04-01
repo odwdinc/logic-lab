@@ -8,6 +8,12 @@ const IO_COLORS = [
 let _colorIdx = 0;
 function nextIOColor() { return IO_COLORS[(_colorIdx++)%IO_COLORS.length]; }
 
+// Batch-build mode: suppress per-operation simulate() calls during bulk construction.
+// Call beginBatchBuild() before, endBatchBuild(cid) after — one simulate at the end.
+let _batchBuild = false;
+function beginBatchBuild() { _batchBuild = true; }
+function endBatchBuild(cid) { _batchBuild = false; if(cid) simulate(cid); }
+
 // ── BLOCK DEFINITIONS ──
 let blockDefs = {};
 let circuits  = {};
@@ -54,7 +60,7 @@ function addNode(cid,defId,x,y,label,opts={}){
   nodeInitHook(node, def, opts);
   circuits[cid].nodes[id]=node;
   nodeAddedHook(node, def, cid);
-  simulate(cid);
+  if(!_batchBuild) simulate(cid);
   return node;
 }
 
@@ -86,7 +92,7 @@ function removeNode(cid,nid){
   if(node){ const def=blockDefs[node.defId]; nodeRemovedHook(node, def, cid); }
   delete c.nodes[nid];
   Object.keys(c.wires).forEach(wi=>{const w=c.wires[wi];if(w.fromNode===nid||w.toNode===nid)delete c.wires[wi];});
-  simulate(cid);
+  if(!_batchBuild) simulate(cid);
 }
 function addWire(cid,fn,fp,tn,tp){
   const c=circuits[cid];
@@ -94,8 +100,8 @@ function addWire(cid,fn,fp,tn,tp){
   Object.keys(c.wires).forEach(wi=>{const w=c.wires[wi];if(w.toNode===tn&&w.toPort===tp)delete c.wires[wi];});
   const id=wid();
   c.wires[id]={id,fromNode:fn,fromPort:fp,toNode:tn,toPort:tp};
-  simulate(cid); return c.wires[id];
+  if(!_batchBuild) simulate(cid); return c.wires[id];
 }
-function removeWire(cid,wid){delete circuits[cid].wires[wid];simulate(cid);}
+function removeWire(cid,wid){delete circuits[cid].wires[wid];if(!_batchBuild) simulate(cid);}
 
 // ── Hex color utilities ──

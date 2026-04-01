@@ -85,6 +85,19 @@ registerNode({
     }
     return false;
   },
+
+  // Consume double-clicks on bit cells so rapid clicking never triggers rename
+  onDblClick(wx, wy, node){
+    if(node._liveFromParent) return false;
+    const g=nodeGeom(node), bits=node._bits||1;
+    const cols=Math.min(bits,8), gs=IONG_SZ+IONG_GAP;
+    const gx=g.x+(g.w-(cols*gs-IONG_GAP))/2, gy=g.y+18;
+    for(let b=0;b<bits;b++){
+      const bx=gx+(b%cols)*gs, by=gy+Math.floor(b/cols)*gs;
+      if(wx>=bx&&wx<bx+IONG_SZ&&wy>=by&&wy<by+IONG_SZ) return true;
+    }
+    return false;
+  },
 });
 
 // ════════════════════════════════════════

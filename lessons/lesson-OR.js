@@ -12,17 +12,11 @@ registerLesson({
 
 You are going to build it by inverting both inputs with NOT gates, then feeding those inverted signals into your NAND block. This is De Morgan's theorem:
 
-  NOT(NOT A  AND  NOT B)  =  A OR B`,
+NOT(NOT A  AND  NOT B)  =  A OR B`,
     },
     {
-      title: 'Build the Circuit',
-      text: `The circuit has been built for you. Trace the wires:
-
-  A ── NOT ──┐
-              NAND ── OUT
-  B ── NOT ──┘
-
-Both inputs are inverted before reaching the NAND gate. De Morgan's theorem guarantees this is equivalent to OR. Try each input combination and verify the output matches what you expect from OR.`,
+      title: 'Test the Circuit',
+      text: `Both inputs are inverted before reaching the NAND gate. De Morgan's theorem guarantees this is equivalent to OR. Try each input combination and verify the output matches what you expect from OR.`,
       build(cid) {
         const nandDef = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'NAND');
         if (!nandDef) return;

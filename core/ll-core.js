@@ -53,7 +53,7 @@ function restoreProject(d){
   Object.keys(blockDefs).forEach(k=>delete blockDefs[k]); initBuiltins();
   (d.customDefs||[]).forEach(def=>{
     blockDefs[def.id]=def;
-    if(def.circuit) def.logic=(inp)=>simulateCompositeInline(def.id,inp);
+    if(def.circuit) def.logic=(inp,inst)=>simulateCompositeInline(def.id,inp,inst);
   });
   Object.keys(circuits).forEach(k=>delete circuits[k]);
   Object.assign(circuits,d.circuits);

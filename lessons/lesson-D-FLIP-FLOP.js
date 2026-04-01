@@ -10,24 +10,27 @@ registerLesson({
       title: 'Edge-Triggered Memory',
       text: `The D Latch is level-triggered: while STORE is high, the output continuously tracks DATA. This causes the race condition problem.
 
-The solution is edge-triggered memory — capture DATA only at the instant the clock transitions from LOW to HIGH (the rising edge), then freeze immediately.
+The solution is edge-triggered memory capture DATA only at the instant the clock transitions from LOW to HIGH (the rising edge), then freeze immediately.
 
 To build this, chain two D Latches:
-  Latch 1 — transparent when CLK=LOW  (captures DATA while clock is low)
-  Latch 2 — transparent when CLK=HIGH (copies Latch 1 when clock goes high)
+  Latch 1 — transparent when CLK=LOW  
+    (captures DATA while clock is low)
 
-On the rising edge (CLK 0→1): Latch 1 freezes with the current DATA. Latch 2 opens and copies Latch 1's frozen value. The result: Q updates exactly once per rising edge.`,
+  Latch 2 — transparent when CLK=HIGH 
+    (copies Latch 1 when clock goes high)
+
+On the rising edge (CLK 0→1): 
+  Latch 1 freezes with the current DATA. 
+  Latch 2 opens and copies Latch 1's frozen value. 
+  The result: Q updates exactly once per rising edge.`,
     },
     {
-      title: 'Build the Circuit',
+      title: 'Test the Circuit',
       text: `The circuit chains two D_LATCH blocks with complementary clock signals:
-
-  DATA ──── Latch1.DATA      Q of Latch1 ──── Latch2.DATA
-  NOT(CLK) → Latch1.STORE   CLK ──────────── Latch2.STORE
-                              Latch2.Q ──────── OUTPUT Q
-
-Latch1 is transparent when NOT(CLK)=1 (i.e. CLK=0), so it tracks DATA while the clock is low.
-When CLK goes high: Latch1 freezes → Latch2 opens and copies Latch1's frozen value → Q updates.`,
+Latch1 is transparent when NOT(CLK)=1 (i.e. CLK=0)
+It tracks DATA while the clock is low.
+When CLK goes high: 
+  Latch1 freezes → Latch2 opens and copies Latch1's frozen value → Q updates.`,
       build(cid) {
         const lDef   = Object.values(blockDefs).find(d => !d.isBuiltin && d.name === 'D_LATCH');
         if (!lDef) return;
@@ -54,10 +57,16 @@ When CLK goes high: Latch1 freezes → Latch2 opens and copies Latch1's frozen v
       title: 'Verify Edge-Triggered Behaviour',
       text: `Follow this sequence exactly:
 1. Start with DATA=0, CLK=0
-2. Click CLK → 1  (rising edge, Q captures DATA=0)
-3. Keep CLK=1, change DATA=1  (Q should NOT change — latch1 is frozen)
-4. Click CLK → 0  (falling edge, Q holds; Latch1 becomes transparent again, now tracks DATA=1)
-5. Click CLK → 1  (next rising edge, Q captures DATA=1)`,
+2. Click CLK → 1  
+  (rising edge, Q captures DATA=0)
+3. Keep CLK=1, change DATA=1
+  (Q should NOT change — latch1 is frozen)
+4. Click CLK → 0  
+  (falling edge, Q holds; Latch1 becomes transparent again, now tracks DATA=1)
+5. Click CLK → 1  
+  (next rising edge, Q captures DATA=1)
+6. Change DATA=0
+  (Q should NOT change — latch1 is frozen)`,
       saveBlock: 'D_FLIP_FLOP',
       test: {
         inputs:  ['DATA', 'CLK'],
