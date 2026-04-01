@@ -760,3 +760,27 @@ Custom blocks are created via "Save as Block" (right-click menu). Entering a blo
 - **`resolveWireDrop` only fires during a wire drag** — implementations must guard with `if (!wireStart) return null` to avoid intercepting regular click/hover events
 - **`resizeSnap` is passed whole to `descApplyResize`** — the full object (including `_wpX/_wpY` stored at drag start) is forwarded so descriptor resize handlers can apply deltas correctly
 - **Node files are optional** — any `nodes/node-*.js` can be removed from `index.html` without crashing the engine; its features simply become unavailable
+
+---
+
+## Architecture Decision Records
+
+Non-obvious design decisions are recorded in `docs/adr-NNN-slug.md`. Each file has a date, a one-line decision, a **Why** section, an **Alternatives rejected** section, and a **Constraints** section.
+
+When making a decision that is not obvious from the code — a choice between two reasonable approaches, a workaround for an engine constraint, a deliberate trade-off — write an ADR. Future contributors (and future Claude sessions) should be able to read it and understand why the code is the way it is without having to reverse-engineer intent.
+
+### Current ADRs
+
+| # | Title |
+|---|---|
+| [001](docs/adr-001-bus-wire-node.md) | BUS_WIRE implemented as a pathline node, not a traditional node box |
+| [002](docs/adr-002-composite-block-per-instance-state.md) | Per-instance `_blockState` for composite block simulation |
+| [003](docs/adr-003-touch-support-synthetic-mouse-events.md) | Mobile touch support via synthetic MouseEvent dispatch |
+| [004](docs/adr-004-lesson-always-rebuild-on-navigate.md) | Lesson build steps always clear and rebuild on navigation |
+| [005](docs/adr-005-color-cycle-guard-prefixed-keys.md) | Separate key prefixes for `portLaneColors` and `gateOutputColor` cycle guards |
+| [006](docs/adr-006-static-files-no-build.md) | No build step — runs directly from static files |
+| [007](docs/adr-007-node-self-registration-pattern.md) | Node types self-register via `registerNode()`; engine never checks type by ID |
+| [008](docs/adr-008-feedback-loop-output-port-seeding.md) | `simulate()` seeds feedback loops by preserving output port values between iterations |
+| [009](docs/adr-009-lesson-nav-monkey-patch.md) | Lesson panel hooks into navigation via monkey-patching `switchToCircuit`/`closeCircuit` |
+| [010](docs/adr-010-simulate-quiet-flag.md) | `simulate(quiet=true)` for timer ticks — patch live values without rebuilding the props panel |
+| [011](docs/adr-011-allcircuits-includes-block-internals.md) | `allCircuits()` returns top-level circuits plus all custom block internal circuits |
