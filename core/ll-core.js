@@ -217,6 +217,16 @@ document.getElementById('btn-load-demo').onclick=()=>{
     loadDemo();
   },'Load Demo');
 };
+
+// File menu toggle
+(function(){
+  const btn=document.getElementById('btn-file-menu');
+  const drop=document.getElementById('file-dropdown');
+  btn.onclick=e=>{e.stopPropagation();drop.classList.toggle('open');};
+  document.addEventListener('click',()=>drop.classList.remove('open'));
+  // Close dropdown when any item inside is clicked
+  drop.addEventListener('click',()=>drop.classList.remove('open'));
+})();
 document.getElementById('btn-bus-vals').onclick=()=>{
   showBusValues=!showBusValues;
   const btn=document.getElementById('btn-bus-vals');

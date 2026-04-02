@@ -16,16 +16,34 @@
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);user-select:none}
 #app{display:flex;flex-direction:column;width:100vw;height:100vh}
 #topbar{height:38px;background:#0f1014;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;padding:0 10px;gap:0;flex-shrink:0;z-index:20}
-.tb-logo{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.12em;margin-right:12px}
-.tb-sep{width:1px;height:22px;background:var(--border2);margin:0 8px}
+  display:flex;align-items:center;padding:0 8px;gap:0;flex-shrink:0;z-index:20}
 .tb-btn{height:27px;padding:0 9px;border:1px solid var(--border2);border-radius:3px;
   background:var(--surface);color:var(--text);font-family:var(--font);font-size:11px;
   cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;transition:background .1s}
 .tb-btn:hover{background:var(--surface2);border-color:rgba(255,255,255,.22)}
 .tb-btn.primary{background:#133a52;border-color:var(--accent);color:var(--accent)}
 .tb-btn.primary:hover{background:#1a4f6e}
-#breadcrumb{display:flex;align-items:center;gap:0;margin-left:8px;overflow:hidden;flex:1}
+
+/* ── File menu ──────────────────────────────────────────────── */
+#file-menu-wrap{position:relative;flex-shrink:0;margin-right:6px}
+#btn-file-menu{height:30px;padding:0 10px;border:1px solid var(--border2);border-radius:3px;
+  background:var(--surface);color:var(--text);font-family:var(--font);font-size:11px;font-weight:700;
+  cursor:pointer;display:flex;align-items:center;gap:5px;letter-spacing:.06em;transition:background .1s}
+#btn-file-menu:hover,#btn-file-menu.open{background:var(--surface2);border-color:rgba(255,255,255,.22)}
+#file-dropdown{display:none;position:absolute;top:calc(100% + 2px);left:0;z-index:300;
+  background:#0f1014;border:1px solid var(--border2);border-radius:4px;
+  padding:4px;min-width:190px;flex-direction:column;gap:1px;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#file-dropdown.open{display:flex}
+.fd-item{height:28px;padding:0 10px;border-radius:3px;display:flex;align-items:center;gap:8px;
+  font-size:11px;color:var(--text);cursor:pointer;transition:background .08s;white-space:nowrap}
+.fd-item:hover{background:var(--surface2)}
+.fd-item.primary{color:var(--accent)}
+.fd-item.warning{color:#a8e060}
+.fd-item.danger{color:#e74c3c}
+.fd-sep{height:1px;background:var(--border2);margin:3px 4px}
+.fd-label{font-size:9px;color:var(--muted);padding:6px 10px 2px;letter-spacing:.08em}
+
+#breadcrumb{display:flex;align-items:center;gap:0;overflow:hidden;flex:1}
 #circuit-tabs{display:flex;align-items:stretch;gap:0;flex:1;overflow-x:auto;min-width:0}
 #circuit-tabs::-webkit-scrollbar{height:3px}
 #circuit-tabs::-webkit-scrollbar-thumb{background:var(--surface2)}
@@ -45,6 +63,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 .bc-item.active{cursor:default}
 .bc-arrow{font-size:10px;color:var(--muted)}
 #sim-status{margin-left:auto;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px}
+
 .sim-dot{width:7px;height:7px;border-radius:50%;background:#27ae60}
 #main{display:flex;flex:1;overflow:hidden}
 #left-panel{width:172px;flex-shrink:0;background:#0f1014;border-right:1px solid var(--border);
@@ -155,20 +174,25 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 <body>
 <div id="app">
   <div id="topbar">
-    <span class="tb-logo">LOGIC LAB</span>
-    <div class="tb-sep"></div>
-    <button class="tb-btn primary" id="btn-save-block" title="Save current circuit as a reusable block">⊞ Save as Block</button>
-    <button class="tb-btn" id="btn-update-block" style="display:none;background:#2d4a1a;border-color:#6abf40;color:#a8e060">⟳ Update Block</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-new-circuit" title="New circuit">⊕ New</button>
-    <button class="tb-btn" id="btn-rename-circuit" title="Rename current circuit">✎ Rename</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-save-project" title="Export / backup (Ctrl+S)">↓ Export</button>
-    <button class="tb-btn" id="btn-load-project" title="Import (Ctrl+O)">↑ Import</button>
-    <button class="tb-btn" id="btn-load-demo" title="Load demo circuits">★ Demos</button>
-    <button class="tb-btn" onclick="openLessonPicker()" title="Interactive lessons">◎ Lessons</button>
-    <div class="tb-sep"></div>
-    <button class="tb-btn" id="btn-bus-vals" title="Toggle bus value labels on wires">🏷 Values</button>
+    <div id="file-menu-wrap">
+      <button id="btn-file-menu">☰ Logic Lab ▾</button>
+      <div id="file-dropdown">
+        <div class="fd-label">CIRCUIT</div>
+        <div class="fd-item primary" id="btn-save-block">⊞ Save as Block</div>
+        <div class="fd-item warning" id="btn-update-block" style="display:none">⟳ Update Block</div>
+        <div class="fd-item" id="btn-new-circuit">⊕ New Circuit</div>
+        <div class="fd-item" id="btn-rename-circuit">✎ Rename Circuit</div>
+        <div class="fd-sep"></div>
+        <div class="fd-label">PROJECT</div>
+        <div class="fd-item" id="btn-save-project">↓ Export</div>
+        <div class="fd-item" id="btn-load-project">↑ Import</div>
+        <div class="fd-item" id="btn-load-demo">★ Load Demos</div>
+        <div class="fd-sep"></div>
+        <div class="fd-label">TOOLS</div>
+        <div class="fd-item" onclick="openLessonPicker()">◎ Lessons</div>
+        <div class="fd-item" id="btn-bus-vals">🏷 Toggle Values</div>
+      </div>
+    </div>
     <div id="breadcrumb">
       <div id="circuit-tabs"></div>
       <div id="bc-crumbs" class="bc-crumb" style="padding-left:8px;flex-shrink:0"></div>

@@ -30,7 +30,18 @@ function showCtx(cx,cy,node,wire){
     }
     if(def?.circuit) add('Enter block (dblclick)',()=>enterBlock(def.id, node.id, currentCircuitId));
     sep();
-    add('Delete',()=>{removeNode(currentCircuitId,node.id);selNodeId=null;updatePropPanel();},'danger');
+    // If the right-clicked node is part of a multi-selection, delete the whole selection
+    const isMulti = selNodeIds.size > 1 && selNodeIds.has(node.id);
+    const delLabel = isMulti ? `Delete (${selNodeIds.size} nodes)` : 'Delete';
+    add(delLabel, () => {
+      if (isMulti) {
+        [...selNodeIds].forEach(id => removeNode(currentCircuitId, id));
+        selNodeIds.clear(); selNodeId = null;
+      } else {
+        removeNode(currentCircuitId, node.id); selNodeId = null;
+      }
+      updatePropPanel();
+    }, 'danger');
   } else if(wire){
     add('Delete wire',()=>removeWire(currentCircuitId,wire.id),'danger');
   } else {

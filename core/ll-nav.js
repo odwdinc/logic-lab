@@ -196,10 +196,10 @@ function updateTopBarButtons(){
   const btnUpdate=document.getElementById('btn-update-block');
   if(_editingDefId&&blockDefs[_editingDefId]){
     btnSave.style.display='none';
-    btnUpdate.style.display='flex';
+    btnUpdate.style.display='block';
     btnUpdate.textContent='⟳ Update "'+blockDefs[_editingDefId].name+'"';
   } else {
-    btnSave.style.display='flex';
+    btnSave.style.display='block';
     btnUpdate.style.display='none';
   }
 }
