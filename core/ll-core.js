@@ -279,6 +279,7 @@ function loadDemo(){
 function init(){
   initBuiltins(); makeCircuit('main','main');
   currentCircuitId='main'; editStack=['main'];
+  rebuildLibrary();
   const stored=localStorage.getItem(LS_KEY);
   if(stored){
     try{
