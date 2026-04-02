@@ -170,7 +170,7 @@ document.getElementById('btn-update-block').onclick=commitBlockUpdate;
 document.getElementById('btn-toggle-blocks').onclick=()=>{
   const lp=document.getElementById('left-panel');
   lp.classList.toggle('collapsed');
-  resizeCanvas();
+  lp.addEventListener('transitionend', resizeCanvas, {once:true});
 };
 
 document.getElementById('btn-rename-circuit').onclick=()=>{
