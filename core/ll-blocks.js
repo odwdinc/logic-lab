@@ -43,6 +43,7 @@ function showCtx(cx,cy,node,wire){
       updatePropPanel();
     }, 'danger');
   } else if(wire){
+    if(wire._pts?.length) add('Clear waypoints',()=>{delete wire._pts;render();});
     add('Delete wire',()=>removeWire(currentCircuitId,wire.id),'danger');
   } else {
     const {x:wx,y:wy}=c2w(cx,cy);

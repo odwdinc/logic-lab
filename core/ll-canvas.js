@@ -36,6 +36,11 @@ let selBoxStart=null;        // {x,y} rubber-band anchor (world coords)
 let selBoxEnd=null;          // {x,y} rubber-band current corner (world coords)
 let dragNodesSnap=null;      // {nodeId:{x,y}} positions at multi-drag start
 
+// Wire waypoint drag state
+let dragWireId=null;   // wire id being waypoint-dragged
+let dragWpIdx=-1;      // index into w._pts being dragged
+let dragWpSnap=null;   // {mx,my,wpX,wpY} captured at drag start
+
 // ── Global display settings ──
 let showBusValues=true;
 

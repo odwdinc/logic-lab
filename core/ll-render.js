@@ -51,6 +51,9 @@ function render(){
   // Nodes
   Object.values(c.nodes).forEach(n=>drawNode(c,n));
 
+  // Wire waypoint handles (rendered after nodes so they appear on top)
+  Object.values(c.wires).forEach(w=>drawWireWaypointHandles(c,w));
+
   // Rubber-band selection box
   if(dragMode==='select'&&selBoxStart&&selBoxEnd){
     const x1=Math.min(selBoxStart.x,selBoxEnd.x),y1=Math.min(selBoxStart.y,selBoxEnd.y);
@@ -96,6 +99,33 @@ function drawWire(c,w){
   const isFloat=val===null;
   const srcColor=portWireColor(currentCircuitId,fn.id,w.fromPort);
 
+  if(w._pts?.length){
+    // ── Routed polyline (has waypoints) ──
+    const pts=[fp,...w._pts,tp];
+    if(bits===1){
+      const activeCol=isFloat?'#3a3040':(val?srcColor||'#e74c3c':'#2a2020');
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x,pts[0].y);
+      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+      ctx.strokeStyle=activeCol; ctx.lineWidth=2; ctx.stroke();
+      if(isFloat){
+        ctx.save(); ctx.setLineDash([3,5]);
+        ctx.strokeStyle='#6060a0'; ctx.lineWidth=1.5;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x,pts[0].y);
+        for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+        ctx.stroke(); ctx.restore();
+      }
+    } else {
+      const laneColors=portLaneColors(currentCircuitId,fn.id,w.fromPort);
+      const hasLanes=laneColors.some(c=>c!==null&&c!==laneColors[0]);
+      rrDrawRibbonBackground(pts,bits);
+      rrDrawLanes(pts,bits,val,srcColor,hasLanes||laneColors[0]!==srcColor?laneColors:null);
+    }
+    return;
+  }
+
   if(bits===1){
     // ── 1-bit wire: single line, src colour when HIGH, dark when LOW, dashed when float ──
     const activeCol=isFloat?'#3a3040':(val?srcColor||'#e74c3c':'#2a2020');
@@ -115,6 +145,25 @@ function drawWire(c,w){
     const laneColors=portLaneColors(currentCircuitId,fn.id,w.fromPort);
     const hasLanes=laneColors.some(c=>c!==null&&c!==laneColors[0]);
     drawBusWire(fp.x,fp.y,tp.x,tp.y,bits,val,srcColor,hasLanes||laneColors[0]!==srcColor?laneColors:null);
+  }
+}
+
+// Draw waypoint handles for wires that have _pts — called after drawNode so handles sit on top.
+function drawWireWaypointHandles(c,w){
+  if(!w._pts?.length) return;
+  const fn=c.nodes[w.fromNode]; if(!fn) return;
+  const srcColor=portWireColor(currentCircuitId,fn.id,w.fromPort)||'#4fc3f7';
+  ctx.shadowBlur=0;
+  for(let i=0;i<w._pts.length;i++){
+    const p=w._pts[i];
+    const isActive=dragMode==='wire_wp'&&dragWireId===w.id&&dragWpIdx===i;
+    ctx.beginPath(); ctx.arc(p.x,p.y,RH_R+2,0,Math.PI*2);
+    ctx.fillStyle='rgba(10,12,16,0.85)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,RH_R,0,Math.PI*2);
+    ctx.fillStyle  =isActive?'#fff':srcColor;
+    ctx.strokeStyle=isActive?srcColor:'rgba(255,255,255,0.7)';
+    ctx.lineWidth  =1.2/vpScale;
+    ctx.fill(); ctx.stroke();
   }
 }
 

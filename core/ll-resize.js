@@ -93,16 +93,44 @@ function hitPort(wx, wy, forDrop=false){
   }
   return null;
 }
+function hitWireWaypoint(wx,wy){
+  const c=circuits[currentCircuitId]; if(!c) return null;
+  const hitR=(RH_HIT+2)/vpScale;
+  for(const w of Object.values(c.wires)){
+    if(!w._pts?.length) continue;
+    for(let i=0;i<w._pts.length;i++){
+      const p=w._pts[i];
+      if((wx-p.x)**2+(wy-p.y)**2<=hitR*hitR) return {wire:w,wpIdx:i};
+    }
+  }
+  return null;
+}
+
 function hitWire(wx,wy){
   const c=circuits[currentCircuitId];
   for(const w of Object.values(c.wires)){
     const fn=c.nodes[w.fromNode],tn=c.nodes[w.toNode]; if(!fn||!tn) continue;
     const fp=portWorldPos(fn,w.fromPort),tp=portWorldPos(tn,w.toPort); if(!fp||!tp) continue;
-    const dx=Math.abs(tp.x-fp.x), cp=Math.max(50,dx*0.55);
-    for(let t=0;t<=1;t+=0.04){
-      const bx=bez(fp.x,fp.x+cp,tp.x-cp,tp.x,t);
-      const by=bez(fp.y,fp.y,tp.y,tp.y,t);
-      if((wx-bx)**2+(wy-by)**2<=(8/vpScale)**2) return w;
+    if(w._pts?.length){
+      // Routed wire: polyline segment hit test
+      const pts=[fp,...w._pts,tp];
+      const hitR=8/vpScale;
+      for(let i=0;i<pts.length-1;i++){
+        const p0=pts[i],p1=pts[i+1];
+        const dx=p1.x-p0.x,dy=p1.y-p0.y;
+        const len2=dx*dx+dy*dy;
+        const frac=len2>0?Math.max(0,Math.min(1,((wx-p0.x)*dx+(wy-p0.y)*dy)/len2)):0;
+        const px=p0.x+dx*frac,py=p0.y+dy*frac;
+        if((wx-px)**2+(wy-py)**2<=hitR*hitR) return w;
+      }
+    } else {
+      // Unrouted wire: bezier hit test
+      const dx=Math.abs(tp.x-fp.x), cp=Math.max(50,dx*0.55);
+      for(let t=0;t<=1;t+=0.04){
+        const bx=bez(fp.x,fp.x+cp,tp.x-cp,tp.x,t);
+        const by=bez(fp.y,fp.y,tp.y,tp.y,t);
+        if((wx-bx)**2+(wy-by)**2<=(8/vpScale)**2) return w;
+      }
     }
   }
   return null;

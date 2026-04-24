@@ -3,142 +3,7 @@
 // drag from the line to any input to add a reader tap.
 // Double-click the line to add a waypoint; double-click a waypoint to remove it.
 // Drag waypoint handles (when selected) to reshape the route.
-
-// ── Path math helpers ──────────────────────────────────────────
-
-function _bwSyncPts(node) {
-  if (!node._pts?.length) return;
-  const dx = node.x - node._pts[0].x;
-  const dy = node.y - node._pts[0].y;
-  if (dx === 0 && dy === 0) return;
-  for (const p of node._pts) { p.x += dx; p.y += dy; }
-}
-
-function _bwPathInfo(pts) {
-  const segs = [];
-  let total = 0;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const dx = pts[i+1].x - pts[i].x, dy = pts[i+1].y - pts[i].y;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    segs.push({ i, len, start: total });
-    total += len;
-  }
-  return { segs, total };
-}
-
-function _bwPtAtT(pts, info, t) {
-  if (info.total === 0 || pts.length < 2) return pts[0] || { x: 0, y: 0 };
-  const target = Math.max(0, Math.min(info.total, t * info.total));
-  for (let s = info.segs.length - 1; s >= 0; s--) {
-    const seg = info.segs[s];
-    if (target >= seg.start || s === 0) {
-      const frac = seg.len > 0 ? (target - seg.start) / seg.len : 0;
-      const p0 = pts[seg.i], p1 = pts[seg.i + 1];
-      return { x: p0.x + (p1.x - p0.x) * frac, y: p0.y + (p1.y - p0.y) * frac };
-    }
-  }
-  return pts[0];
-}
-
-function _bwNearestT(pts, info, wx, wy) {
-  let bestT = 0, bestDist2 = Infinity;
-  for (const seg of info.segs) {
-    const p0 = pts[seg.i], p1 = pts[seg.i + 1];
-    const dx = p1.x - p0.x, dy = p1.y - p0.y;
-    const len2 = dx*dx + dy*dy;
-    const frac = len2 > 0 ? Math.max(0, Math.min(1, ((wx-p0.x)*dx+(wy-p0.y)*dy)/len2)) : 0;
-    const px = p0.x + dx*frac, py = p0.y + dy*frac;
-    const d2 = (wx-px)**2 + (wy-py)**2;
-    if (d2 < bestDist2) {
-      bestDist2 = d2;
-      bestT = info.total > 0 ? (seg.start + frac * seg.len) / info.total : 0;
-    }
-  }
-  return { t: bestT, dist: Math.sqrt(bestDist2) };
-}
-
-// ── Ribbon drawing helpers ─────────────────────────────────────
-
-// Compute an offset polyline: each point is shifted perpendicular to the path by `off` px.
-// Interior points use miter intersection so lanes connect cleanly at corners.
-function _bwOffsetPolyline(pts, off) {
-  const result = [];
-  for (let i = 0; i < pts.length; i++) {
-    if (i === 0) {
-      const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
-      const len = Math.sqrt(dx*dx + dy*dy);
-      if (len < 0.001) { result.push({ x: pts[0].x, y: pts[0].y }); continue; }
-      result.push({ x: pts[0].x - dy/len*off, y: pts[0].y + dx/len*off });
-    } else if (i === pts.length - 1) {
-      const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y;
-      const len = Math.sqrt(dx*dx + dy*dy);
-      if (len < 0.001) { result.push({ x: pts[i].x, y: pts[i].y }); continue; }
-      result.push({ x: pts[i].x - dy/len*off, y: pts[i].y + dx/len*off });
-    } else {
-      const dx1 = pts[i].x - pts[i-1].x, dy1 = pts[i].y - pts[i-1].y;
-      const len1 = Math.sqrt(dx1*dx1 + dy1*dy1);
-      const dx2 = pts[i+1].x - pts[i].x, dy2 = pts[i+1].y - pts[i].y;
-      const len2 = Math.sqrt(dx2*dx2 + dy2*dy2);
-      if (len1 < 0.001 || len2 < 0.001) { result.push({ x: pts[i].x, y: pts[i].y }); continue; }
-      const n1x = -dy1/len1, n1y = dx1/len1;
-      const n2x = -dy2/len2, n2y = dx2/len2;
-      let bx = n1x + n2x, by = n1y + n2y;
-      const blen = Math.sqrt(bx*bx + by*by);
-      if (blen < 0.001) {
-        result.push({ x: pts[i].x + n1x*off, y: pts[i].y + n1y*off });
-      } else {
-        bx /= blen; by /= blen;
-        const dot = bx*n1x + by*n1y;
-        const miter = Math.abs(dot) > 0.1 ? off/dot : off*8;
-        const clamped = Math.sign(miter) * Math.min(Math.abs(miter), Math.abs(off)*8);
-        result.push({ x: pts[i].x + bx*clamped, y: pts[i].y + by*clamped });
-      }
-    }
-  }
-  return result;
-}
-
-// Draw lane stripes as continuous offset polylines (no gaps at corners)
-function _bwDrawLanes(pts, bits, val, srcColor, laneColors) {
-  const isFloat = val === null;
-  const LANE = 3, GAP = 1;
-  const totalW = bits*(LANE+GAP) - GAP;
-  const base = -(totalW/2);
-  ctx.lineCap  = 'round';
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = LANE;
-  for (let b = 0; b < bits; b++) {
-    const bitVal = isFloat ? null : ((val >> (bits-1-b)) & 1);
-    const off = base + b*(LANE+GAP) + LANE/2;
-    const laneCol = laneColors ? laneColors[b]||srcColor : srcColor;
-    const op = _bwOffsetPolyline(pts, off);
-    ctx.beginPath();
-    ctx.moveTo(op[0].x, op[0].y);
-    for (let i = 1; i < op.length; i++) ctx.lineTo(op[i].x, op[i].y);
-    ctx.strokeStyle = isFloat ? '#3a3040' : bitVal===1 ? (laneCol||'#e74c3c') : '#2a2a38';
-    ctx.stroke();
-  }
-}
-
-// Draw jacket + body for the entire path as a continuous polyline (no caps at interior waypoints)
-function _bwDrawRibbonBackground(pts, bits) {
-  if (pts.length < 2) return;
-  const LANE = 3, GAP = 1;
-  const totalW = bits*(LANE+GAP) - GAP;
-  ctx.lineCap  = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = totalW + 4; ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, pts[0].y);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  ctx.strokeStyle = '#1a1a24'; ctx.lineWidth = totalW + 1; ctx.stroke();
-}
-
-// ── Node descriptor ────────────────────────────────────────────
+// Path math and ribbon drawing live in core/ll-reroute.js (rr* helpers).
 
 registerNode({
   id:    'BUS_WIRE',
@@ -167,12 +32,12 @@ registerNode({
     if (!node._pts?.length) node._pts = [{ x: node.x, y: node.y }, { x: node.x + 200, y: node.y }];
     if (!node._taps)    node._taps    = [];
     if (!node._tapNext) node._tapNext = 0;
-    _bwSyncPts(node);
+    rrSyncPts(node);
     const pts  = node._pts;
-    const info = _bwPathInfo(pts);
+    const info = rrPathInfo(pts);
     const bits = node._bits || 1;
     const LANE = 3, GAP = 1;
-    const PAD  = (bits*(LANE+GAP) + 10) / 2 + 14; // ribbon half-width + waypoint handle
+    const PAD  = (bits*(LANE+GAP) + 10) / 2 + 14;
 
     const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
     const bx = Math.min(...xs) - PAD, by = Math.min(...ys) - PAD;
@@ -181,7 +46,7 @@ registerNode({
 
     const ports = {};
     for (const tap of (node._taps || [])) {
-      const pos = _bwPtAtT(pts, info, tap.t);
+      const pos = rrPtAtT(pts, info, tap.t);
       ports[tap.id] = { x: pos.x - bx, y: pos.y - by, bits, dir: tap.dir, name: '', noStub: true };
     }
     return { x: bx, y: by, w: bw, h: bh, ports };
@@ -221,11 +86,11 @@ registerNode({
   // ── Custom hit-test: only hit if near a path segment ───────
   hitTest(wx, wy, node) {
     if (!node._pts?.length) return false;
-    _bwSyncPts(node);
+    rrSyncPts(node);
     const pts  = node._pts;
     const bits = node._bits || 1;
     const LANE = 3, GAP = 1;
-    const hitR = (bits*(LANE+GAP) - GAP + 4) / 2 + 6; // ribbon half-width + tolerance
+    const hitR = (bits*(LANE+GAP) - GAP + 4) / 2 + 6;
 
     for (let i = 0; i < pts.length - 1; i++) {
       const p0 = pts[i], p1 = pts[i+1];
@@ -244,11 +109,11 @@ registerNode({
   resolveWireDrop(wx, wy, node, cid, forDrop) {
     if (!wireStart) return null;
     if (!node._pts?.length) node._pts = [{ x: node.x, y: node.y }, { x: node.x + 200, y: node.y }];
-    _bwSyncPts(node);
+    rrSyncPts(node);
     const pts  = node._pts;
-    const info = _bwPathInfo(pts);
+    const info = rrPathInfo(pts);
     const hitR = PORT_HIT / vpScale;
-    const { t, dist } = _bwNearestT(pts, info, wx, wy);
+    const { t, dist } = rrNearestT(pts, info, wx, wy);
     if (dist > hitR) return null;
 
     const bits = node._bits || 1;
@@ -264,14 +129,14 @@ registerNode({
     // Reuse nearby existing tap with matching direction
     for (const tap of node._taps) {
       if (tap.dir !== neededDir) continue;
-      const tapPos = _bwPtAtT(pts, info, tap.t);
+      const tapPos = rrPtAtT(pts, info, tap.t);
       if ((wx-tapPos.x)**2 + (wy-tapPos.y)**2 <= hitR*hitR) {
         const g = nodeGeom(node);
         return { node, portId: tap.id, pp: g.ports[tap.id] };
       }
     }
 
-    const pos = _bwPtAtT(pts, info, t);
+    const pos = rrPtAtT(pts, info, t);
     const g   = nodeGeom(node);
     const pp  = { x: pos.x - g.x, y: pos.y - g.y, bits, dir: neededDir, name: '', noStub: true };
 
@@ -282,73 +147,19 @@ registerNode({
     return { node, portId: tapId, pp };
   },
 
-  // ── Waypoint handle hit-test (called via descHitWaypoint) ──
-  hitWaypoint(wx, wy, node) {
-    if (!node._pts?.length) return null;
-    _bwSyncPts(node);
-    const hitR = (RH_HIT + 2) / vpScale;
-    for (let i = 0; i < (node._pts || []).length; i++) {
-      const p = node._pts[i];
-      if ((wx-p.x)**2 + (wy-p.y)**2 <= hitR*hitR)
-        return { id: 'wp_' + i, cur: 'move', _wpIdx: i };
-    }
-    return null;
-  },
+  // ── Waypoint / tap handle hit-test ─────────────────────────
+  hitWaypoint(wx, wy, node) { return rrHitWaypoint(wx, wy, node); },
 
   // ── Waypoint drag ──────────────────────────────────────────
-  applyResize(node, handleId, snap, dx, dy) {
-    if (!handleId.startsWith('wp_')) return false;
-    const i = parseInt(handleId.slice(3));
-    if (!node._pts?.[i]) return true;
-    node._pts[i] = {
-      x: Math.round((snap._wpX + dx) / 10) * 10,
-      y: Math.round((snap._wpY + dy) / 10) * 10,
-    };
-    if (i === 0) { node.x = node._pts[0].x; node.y = node._pts[0].y; }
-    return true;
-  },
+  applyResize(node, handleId, snap, dx, dy) { return rrApplyResize(node, handleId, snap, dx, dy); },
 
   // ── Double-click: add / remove waypoints ───────────────────
-  onDblClick(wx, wy, node, cid) {
-    if (!node._pts?.length) node._pts = [{ x: node.x, y: node.y }, { x: node.x + 200, y: node.y }];
-    _bwSyncPts(node);
-    const pts  = node._pts;
-    const hitR = (RH_HIT + 4) / vpScale;
-
-    // Near existing waypoint → remove it (keep ≥2)
-    for (let i = 0; i < pts.length; i++) {
-      if ((wx-pts[i].x)**2 + (wy-pts[i].y)**2 <= hitR*hitR) {
-        if (pts.length <= 2) return true;
-        pts.splice(i, 1);
-        if (i === 0) { node.x = pts[0].x; node.y = pts[0].y; }
-        simulate(cid); render(); return true;
-      }
-    }
-
-    // Near path → insert waypoint
-    const info = _bwPathInfo(pts);
-    const { t, dist } = _bwNearestT(pts, info, wx, wy);
-    if (dist > hitR * 3) return false;
-    const target = t * info.total;
-    for (let s = 0; s < info.segs.length; s++) {
-      const seg = info.segs[s];
-      if (target <= seg.start + seg.len || s === info.segs.length - 1) {
-        const frac = seg.len > 0 ? (target - seg.start) / seg.len : 0;
-        const p0 = pts[seg.i], p1 = pts[seg.i + 1];
-        pts.splice(seg.i + 1, 0, {
-          x: Math.round((p0.x + (p1.x-p0.x)*frac) / 10) * 10,
-          y: Math.round((p0.y + (p1.y-p0.y)*frac) / 10) * 10,
-        });
-        simulate(cid); render(); return true;
-      }
-    }
-    return false;
-  },
+  onDblClick(wx, wy, node, cid) { return rrOnDblClick(wx, wy, node, cid); },
 
   // ── Draw ──────────────────────────────────────────────────
   draw(g, node, def, isSel) {
     if (!node._pts?.length) node._pts = [{ x: node.x, y: node.y }, { x: node.x + 200, y: node.y }];
-    _bwSyncPts(node);
+    rrSyncPts(node);
     const pts      = node._pts;
     const bits     = node._bits || 1;
     const taps     = node._taps || [];
@@ -387,13 +198,13 @@ registerNode({
 
     // Draw ribbon: full-path jacket+body, then continuous offset lane polylines
     if (pts.length >= 2) {
-      _bwDrawRibbonBackground(pts, bits);
-      _bwDrawLanes(pts, bits, drawVal, drawCol, laneColors);
+      rrDrawRibbonBackground(pts, bits);
+      rrDrawLanes(pts, bits, drawVal, drawCol, laneColors);
     }
 
     // Conflict label
     if (conflict && pts.length >= 2 && vpScale > 0.3) {
-      const mid = _bwPtAtT(pts, _bwPathInfo(pts), 0.5);
+      const mid = rrPtAtT(pts, rrPathInfo(pts), 0.5);
       ctx.font         = `700 ${8/vpScale}px JetBrains Mono`;
       ctx.textAlign    = 'center';
       ctx.textBaseline = 'bottom';
@@ -411,9 +222,9 @@ registerNode({
     }
 
     // Tap dots
-    const info = _bwPathInfo(pts);
+    const info = rrPathInfo(pts);
     for (const tap of taps) {
-      const pos = _bwPtAtT(pts, info, tap.t);
+      const pos = rrPtAtT(pts, info, tap.t);
       const hov = hovPortKey === node.id + '_' + tap.id;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, (PORT_R + 1.5) / vpScale, 0, Math.PI*2);
@@ -427,8 +238,8 @@ registerNode({
 
     // Wire-drag preview dot
     if (dragMode === 'wire' && hovPortKey === node.id + '_tap_preview') {
-      const { t } = _bwNearestT(pts, info, mouseWX, mouseWY);
-      const pos = _bwPtAtT(pts, info, t);
+      const { t } = rrNearestT(pts, info, mouseWX, mouseWY);
+      const pos = rrPtAtT(pts, info, t);
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, (PORT_R + 1.5) / vpScale, 0, Math.PI*2);
       ctx.fillStyle   = '#fff';
@@ -440,19 +251,7 @@ registerNode({
     }
 
     // Waypoint handles (only when selected)
-    if (isSel) {
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i];
-        const isActive = dragMode === 'resize' && resizeHandle?._wpIdx === i;
-        ctx.beginPath(); ctx.arc(p.x, p.y, RH_R + 2, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(10,12,16,0.85)'; ctx.fill();
-        ctx.beginPath(); ctx.arc(p.x, p.y, RH_R, 0, Math.PI*2);
-        ctx.fillStyle   = isActive ? '#fff' : color;
-        ctx.strokeStyle = isActive ? color : 'rgba(255,255,255,0.7)';
-        ctx.lineWidth   = 1.2 / vpScale;
-        ctx.fill(); ctx.stroke();
-      }
-    }
+    rrDrawWaypoints(pts, isSel, color);
 
     ctx.restore();
   },

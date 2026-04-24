@@ -22,6 +22,14 @@ canvas.addEventListener('mousedown',e=>{
   }
   if(e.button===2) return;
 
+  // ── Wire waypoint handle drag (check before port/node) ──
+  const wwh=hitWireWaypoint(wx,wy);
+  if(wwh){
+    dragMode='wire_wp'; dragWireId=wwh.wire.id; dragWpIdx=wwh.wpIdx;
+    dragWpSnap={mx:wx,my:wy,wpX:wwh.wire._pts[wwh.wpIdx].x,wpY:wwh.wire._pts[wwh.wpIdx].y};
+    canvas.style.cursor='move'; return;
+  }
+
   // ── Resize handle hit (must check before port/node) ──
   const rh=hitResizeHandle(wx,wy);
   if(rh){
@@ -103,7 +111,20 @@ canvas.addEventListener('mousemove',e=>{
     applyResize(wx,wy);
     render(); updatePropPanel(); return;
   }
-  // Hover — check resize handles first, then port dots, then IO cells, then nodes
+  if(dragMode==='wire_wp'){
+    const c=circuits[currentCircuitId];
+    const w=c?.wires[dragWireId];
+    if(w?._pts?.[dragWpIdx]!==undefined){
+      w._pts[dragWpIdx]={
+        x:Math.round((dragWpSnap.wpX+wx-dragWpSnap.mx)/10)*10,
+        y:Math.round((dragWpSnap.wpY+wy-dragWpSnap.my)/10)*10,
+      };
+    }
+    render(); return;
+  }
+  // Hover — check wire waypoint handles, resize handles, port dots, IO cells, nodes
+  const wwh2=hitWireWaypoint(wx,wy);
+  if(wwh2){canvas.style.cursor='move';return;}
   const rh=hitResizeHandle(wx,wy);
   if(rh){canvas.style.cursor=rh.cur;return;}
   const ph=hitPort(wx,wy);
@@ -156,6 +177,10 @@ canvas.addEventListener('mouseup',e=>{
     dragMode=null;resizeHandle=null;resizeSnap=null;
     canvas.style.cursor='default';simulate(currentCircuitId);return;
   }
+  if(dragMode==='wire_wp'){
+    dragMode=null; dragWireId=null; dragWpIdx=-1; dragWpSnap=null;
+    canvas.style.cursor='default'; render(); return;
+  }
   if(dragMode==='wire'&&wireStart){
     const {cx,cy}=getXY(e);
     const {x:wx,y:wy}=c2w(cx,cy);
@@ -207,6 +232,47 @@ canvas.addEventListener('dblclick',e=>{
         if(v){n.label=v.slice(0,24);render();updatePropPanel();}
       },'Rename');
       setTimeout(()=>{ const el=document.getElementById('rename-inp'); if(el){el.select();} },50);
+    }
+    return;
+  }
+  // Wire double-click: add/remove waypoints
+  const w=hitWire(wx,wy);
+  if(w){
+    const c=circuits[currentCircuitId];
+    const fn=c.nodes[w.fromNode],tn=c.nodes[w.toNode];
+    const fp=portWorldPos(fn,w.fromPort),tp=portWorldPos(tn,w.toPort);
+    if(!fp||!tp) return;
+    // Near existing waypoint → remove it
+    if(w._pts?.length){
+      const hitR=(RH_HIT+4)/vpScale;
+      for(let i=0;i<w._pts.length;i++){
+        if((wx-w._pts[i].x)**2+(wy-w._pts[i].y)**2<=hitR*hitR){
+          w._pts.splice(i,1);
+          if(!w._pts.length) delete w._pts;
+          render(); return;
+        }
+      }
+    }
+    // No existing waypoints → place first one at click position
+    if(!w._pts){
+      w._pts=[{x:Math.round(wx/10)*10,y:Math.round(wy/10)*10}];
+      render(); return;
+    }
+    // Insert waypoint into existing polyline at the nearest segment
+    const pts=[fp,...w._pts,tp];
+    const info=rrPathInfo(pts);
+    const target=rrNearestT(pts,info,wx,wy).t*info.total;
+    for(let s=0;s<info.segs.length;s++){
+      const seg=info.segs[s];
+      if(target<=seg.start+seg.len||s===info.segs.length-1){
+        const frac=seg.len>0?(target-seg.start)/seg.len:0;
+        const p0=pts[seg.i],p1=pts[seg.i+1];
+        w._pts.splice(seg.i,0,{
+          x:Math.round((p0.x+(p1.x-p0.x)*frac)/10)*10,
+          y:Math.round((p0.y+(p1.y-p0.y)*frac)/10)*10,
+        });
+        render(); return;
+      }
     }
   }
 });
