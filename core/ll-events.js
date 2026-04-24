@@ -25,6 +25,7 @@ canvas.addEventListener('mousedown',e=>{
   // ── Wire waypoint handle drag (check before port/node) ──
   const wwh=hitWireWaypoint(wx,wy);
   if(wwh){
+    pushUndo();
     dragMode='wire_wp'; dragWireId=wwh.wire.id; dragWpIdx=wwh.wpIdx;
     dragWpSnap={mx:wx,my:wy,wpX:wwh.wire._pts[wwh.wpIdx].x,wpY:wwh.wire._pts[wwh.wpIdx].y};
     canvas.style.cursor='move'; return;
@@ -33,6 +34,7 @@ canvas.addEventListener('mousedown',e=>{
   // ── Resize handle hit (must check before port/node) ──
   const rh=hitResizeHandle(wx,wy);
   if(rh){
+    pushUndo();
     const n=circuits[currentCircuitId].nodes[selNodeId];
     const g=nodeGeom(n);
     dragMode='resize'; dragNodeId=selNodeId; resizeHandle=rh;
@@ -63,12 +65,14 @@ canvas.addEventListener('mousedown',e=>{
     }
     if(selNodeIds.has(nh.id)&&selNodeIds.size>1){
       // Drag the whole multi-selection
+      pushUndo();
       dragMode='nodes';dragOffX=wx;dragOffY=wy;
       dragNodesSnap={};
       selNodeIds.forEach(id=>{const n=circuits[currentCircuitId].nodes[id];if(n)dragNodesSnap[id]={x:n.x,y:n.y};});
       canvas.style.cursor='grabbing';return;
     }
     // Single select + drag
+    pushUndo();
     selNodeIds=new Set([nh.id]);
     selNodeId=nh.id;dragMode='node';dragNodeId=nh.id;
     dragOffX=wx-nh.x;dragOffY=wy-nh.y;
@@ -229,7 +233,7 @@ canvas.addEventListener('dblclick',e=>{
           <input id="rename-inp" class="prop-input" value="${(n.label||def.name).replace(/"/g,'&quot;')}" maxlength="24" autofocus></div>`;
       openModal('Rename Node','',()=>{
         const v=document.getElementById('rename-inp')?.value?.trim();
-        if(v){n.label=v.slice(0,24);render();updatePropPanel();}
+        if(v){pushUndo();n.label=v.slice(0,24);render();updatePropPanel();}
       },'Rename');
       setTimeout(()=>{ const el=document.getElementById('rename-inp'); if(el){el.select();} },50);
     }
@@ -238,6 +242,7 @@ canvas.addEventListener('dblclick',e=>{
   // Wire double-click: add/remove waypoints
   const w=hitWire(wx,wy);
   if(w){
+    pushUndo();
     const c=circuits[currentCircuitId];
     const fn=c.nodes[w.fromNode],tn=c.nodes[w.toNode];
     const fp=portWorldPos(fn,w.fromPort),tp=portWorldPos(tn,w.toPort);

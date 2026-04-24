@@ -11,7 +11,7 @@ function nextIOColor() { return IO_COLORS[(_colorIdx++)%IO_COLORS.length]; }
 // Batch-build mode: suppress per-operation simulate() calls during bulk construction.
 // Call beginBatchBuild() before, endBatchBuild(cid) after — one simulate at the end.
 let _batchBuild = false;
-function beginBatchBuild() { _batchBuild = true; }
+function beginBatchBuild() { pushUndo(); _batchBuild = true; }
 function endBatchBuild(cid) { _batchBuild = false; if(cid) simulate(cid); }
 
 // ── BLOCK DEFINITIONS ──
@@ -26,6 +26,12 @@ let _nid=1,_wid=1,_did=1000;
 const nid=()=>'n'+(++_nid);
 const wid=()=>'w'+(++_wid);
 const did=()=>'d'+(++_did);
+
+// Stub replaced by ll-undo.js after full initialization
+let pushUndo=()=>{};
+// Set to true around multi-mutation operations so only one undo step is recorded
+let _undoGroupLock=false;
+function _maybePushUndo(){if(!_undoGroupLock&&!_batchBuild)pushUndo();}
 
 function addDef(d){ blockDefs[d.id]=d; }
 function makeCircuit(id,name){
@@ -48,6 +54,7 @@ function nodeBits(node){
 
 // ── Place node ──
 function addNode(cid,defId,x,y,label,opts={}){
+  _maybePushUndo();
   const def=blockDefs[defId]; if(!def) return null;
   const id=nid();
   const pv={};
@@ -66,6 +73,7 @@ function addNode(cid,defId,x,y,label,opts={}){
 
 // ── Change bus width on an existing IO node ──
 function setNodeBits(cid,nodeId,bits){
+  _maybePushUndo();
   const c=circuits[cid]; const node=c.nodes[nodeId]; if(!node) return;
   const def=blockDefs[node.defId]; if(!def?.isIO) return;
   bits=Math.max(1,Math.min(8,bits));
@@ -87,6 +95,7 @@ function allCircuits(){
 
 
 function removeNode(cid,nid){
+  _maybePushUndo();
   const c=circuits[cid];
   const node=c.nodes[nid];
   if(node){ const def=blockDefs[node.defId]; nodeRemovedHook(node, def, cid); }
@@ -95,6 +104,7 @@ function removeNode(cid,nid){
   if(!_batchBuild) simulate(cid);
 }
 function addWire(cid,fn,fp,tn,tp){
+  _maybePushUndo();
   const c=circuits[cid];
   // only one driver per input port
   Object.keys(c.wires).forEach(wi=>{const w=c.wires[wi];if(w.toNode===tn&&w.toPort===tp)delete c.wires[wi];});
@@ -102,6 +112,6 @@ function addWire(cid,fn,fp,tn,tp){
   c.wires[id]={id,fromNode:fn,fromPort:fp,toNode:tn,toPort:tp};
   if(!_batchBuild) simulate(cid); return c.wires[id];
 }
-function removeWire(cid,wid){delete circuits[cid].wires[wid];if(!_batchBuild) simulate(cid);}
+function removeWire(cid,wid){_maybePushUndo();delete circuits[cid].wires[wid];if(!_batchBuild) simulate(cid);}
 
 // ── Hex color utilities ──

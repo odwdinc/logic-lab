@@ -194,6 +194,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
         <div class="fd-item" id="btn-bus-vals">🏷 Toggle Values</div>
       </div>
     </div>
+    <button id="btn-undo" class="tb-btn" onclick="undo()" title="Undo (Ctrl+Z)" disabled style="opacity:0.4;margin-left:4px">↩</button>
+    <button id="btn-redo" class="tb-btn" onclick="redo()" title="Redo (Ctrl+Shift+Z)" disabled style="opacity:0.4;margin-right:4px">↪</button>
     <div id="breadcrumb">
       <div id="circuit-tabs"></div>
       <div id="bc-crumbs" class="bc-crumb" style="padding-left:8px;flex-shrink:0"></div>
@@ -274,6 +276,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 <script src="core/ll-nav.js"></script>
 <script src="core/ll-props.js"></script>
 <script src="core/ll-core.js"></script>
+<script src="core/ll-undo.js"></script>
 <script src="core/ll-lessons.js"></script>
 
 <script src="lessons/lesson-AND.js"></script>

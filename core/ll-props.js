@@ -107,7 +107,11 @@ function updatePropPanel(){
       onclick="enterBlock('${def.id}')">▶ Enter</button>`;
   p.innerHTML=html;
 
-  document.getElementById('pli')?.addEventListener('input',e=>{n.label=e.target.value;render();});
+  const _pli=document.getElementById('pli');
+  if(_pli){
+    _pli.addEventListener('focus',()=>pushUndo());
+    _pli.addEventListener('input',e=>{n.label=e.target.value;render();});
+  }
 
   // Node-specific event binding — delegated to registry descriptor
   bindDescProps(n, def, currentCircuitId);

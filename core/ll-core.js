@@ -126,10 +126,14 @@ document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
   if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();
     if(selNodeIds.size>0){
+      pushUndo();_undoGroupLock=true;
       selNodeIds.forEach(id=>removeNode(currentCircuitId,id));
+      _undoGroupLock=false;
       selNodeIds.clear();selNodeId=null;updatePropPanel();
     } else if(selNodeId){removeNode(currentCircuitId,selNodeId);selNodeId=null;updatePropPanel();}
   }
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key==='z'){e.preventDefault();undo();}
+  if((e.ctrlKey||e.metaKey)&&((e.shiftKey&&(e.key==='z'||e.key==='Z'))||e.key==='y')){e.preventDefault();redo();}
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();
     if(_editingDefId) commitBlockUpdate();
     else { autosave(); toast('Saved'); }

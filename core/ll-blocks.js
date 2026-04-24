@@ -18,7 +18,7 @@ function showCtx(cx,cy,node,wire){
           <input id="rename-inp" class="prop-input" value="${(node.label||'').replace(/"/g,'&quot;')}" maxlength="24" autofocus></div>`;
       openModal('Rename Node','',()=>{
         const v=document.getElementById('rename-inp')?.value?.trim();
-        if(v){node.label=v.slice(0,20);render();updatePropPanel();}
+        if(v){pushUndo();node.label=v.slice(0,20);render();updatePropPanel();}
       },'Rename');
       setTimeout(()=>{ const el=document.getElementById('rename-inp'); if(el){el.select();} },50);
     });
@@ -35,7 +35,9 @@ function showCtx(cx,cy,node,wire){
     const delLabel = isMulti ? `Delete (${selNodeIds.size} nodes)` : 'Delete';
     add(delLabel, () => {
       if (isMulti) {
+        pushUndo();_undoGroupLock=true;
         [...selNodeIds].forEach(id => removeNode(currentCircuitId, id));
+        _undoGroupLock=false;
         selNodeIds.clear(); selNodeId = null;
       } else {
         removeNode(currentCircuitId, node.id); selNodeId = null;
@@ -43,7 +45,7 @@ function showCtx(cx,cy,node,wire){
       updatePropPanel();
     }, 'danger');
   } else if(wire){
-    if(wire._pts?.length) add('Clear waypoints',()=>{delete wire._pts;render();});
+    if(wire._pts?.length) add('Clear waypoints',()=>{pushUndo();delete wire._pts;render();});
     add('Delete wire',()=>removeWire(currentCircuitId,wire.id),'danger');
   } else {
     const {x:wx,y:wy}=c2w(cx,cy);
