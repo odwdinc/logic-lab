@@ -278,18 +278,25 @@ function drawNode(c,node){
   ctx.lineWidth=(isSel?1.5:1)/vpScale; ctx.stroke();
   ctx.restore();
 
-  // Header
-  ctx.beginPath();
-  ctx.moveTo(g.x,g.y+NLH); ctx.lineTo(g.x+g.w,g.y+NLH);
-  ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1/vpScale; ctx.stroke();
-  ctx.fillStyle=def.color+'28';
-  rr(g.x,g.y,g.w,NLH,4);
-  ctx.fill();
+  const hasBody=nodeHasBodyContent(node,def);
 
-  // Label
-  ctx.font=`700 ${11/vpScale}px JetBrains Mono`;
-  ctx.fillStyle=def.color; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(node.label||def.name,g.x+g.w/2,g.y+NLH/2);
+  if(hasBody){
+    // Header band + label in header
+    ctx.beginPath();
+    ctx.moveTo(g.x,g.y+NLH); ctx.lineTo(g.x+g.w,g.y+NLH);
+    ctx.strokeStyle='rgba(255,255,255,0.06)'; ctx.lineWidth=1/vpScale; ctx.stroke();
+    ctx.fillStyle=def.color+'28';
+    rr(g.x,g.y,g.w,NLH,4);
+    ctx.fill();
+    ctx.font=`700 ${11/vpScale}px JetBrains Mono`;
+    ctx.fillStyle=def.color; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(node.label||def.name,g.x+g.w/2,g.y+NLH/2);
+  } else {
+    // No header — name centered in the full gate body
+    ctx.font=`700 ${11/vpScale}px JetBrains Mono`;
+    ctx.fillStyle=def.color; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(node.label||def.name,g.x+g.w/2,g.y+g.h/2);
+  }
 
   // ── Mini displays: recursively collect ALL display nodes at any depth ──
   if(def.circuit){
@@ -341,15 +348,14 @@ function drawNode(c,node){
     const isHovP=hovPortKey===node.id+'_'+pid;
     const wCol=portWireColor(currentCircuitId,node.id,pid);
     const isFloat=val===null;
-    const stubLen=18;
-    const dotX=pp.dir==='in'?wx-stubLen:wx+stubLen;
+    const dotX=pp.dir==='in'?wx-STUB_LEN:wx+STUB_LEN;
 
     if(pp.bits===1){
       // 1-bit: stub line + dot at tip
       const activeCol=isFloat?'#3a3040':(val?wCol:'#2a2020');
       ctx.beginPath();
-      ctx.moveTo(pp.dir==='in'?wx-stubLen:wx, wy);
-      ctx.lineTo(pp.dir==='in'?wx:wx+stubLen, wy);
+      ctx.moveTo(pp.dir==='in'?wx-STUB_LEN:wx, wy);
+      ctx.lineTo(pp.dir==='in'?wx:wx+STUB_LEN, wy);
       ctx.strokeStyle=activeCol; ctx.lineWidth=1.5/vpScale; ctx.stroke();
 
       ctx.beginPath(); ctx.arc(dotX,wy,PORT_R/vpScale,0,Math.PI*2);
@@ -362,38 +368,22 @@ function drawNode(c,node){
       ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.lineWidth=1/vpScale; ctx.stroke();
     }
 
-    // ── Port name label ──
+    // ── Port name label (outside the node, above the stub dot) ──
     if(pp.name&&vpScale>0.45){
       ctx.font=`600 ${9/vpScale}px JetBrains Mono`;
-      if(def.circuit){
-        // Above the stub dot, pill background for readability
-        const labelX=dotX;
-        const labelY=wy-PORT_R/vpScale-2/vpScale;
-        const tw=ctx.measureText(pp.name).width;
-        const ph=11/vpScale, pw=tw+6/vpScale, pr=3/vpScale;
-        // Pill background
-        ctx.save();
-        rr(labelX-pw/2, labelY-ph, pw, ph, pr);
-        ctx.fillStyle='rgba(10,12,18,0.82)'; ctx.fill();
-        rr(labelX-pw/2, labelY-ph, pw, ph, pr);
-        ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=0.5/vpScale; ctx.stroke();
-        ctx.restore();
-        // Label text
-        ctx.fillStyle='rgba(255,255,255,0.75)';
-        ctx.textAlign='center'; ctx.textBaseline='bottom';
-        ctx.fillText(pp.name, labelX, labelY);
-      } else {
-        // Inside: standard gate label near edge
-        ctx.fillStyle='rgba(255,255,255,0.5)';
-        ctx.textBaseline='middle';
-        if(pp.dir==='in'){
-          ctx.textAlign='left';
-          ctx.fillText(pp.name, wx+5, wy);
-        } else {
-          ctx.textAlign='right';
-          ctx.fillText(pp.name, wx-5, wy);
-        }
-      }
+      const labelX = pp.bits>1 ? wx : dotX;
+      const labelY = wy-PORT_R/vpScale-2/vpScale;
+      const tw=ctx.measureText(pp.name).width;
+      const ph=11/vpScale, pw=tw+6/vpScale, pr=3/vpScale;
+      ctx.save();
+      rr(labelX-pw/2, labelY-ph, pw, ph, pr);
+      ctx.fillStyle='rgba(10,12,18,0.82)'; ctx.fill();
+      rr(labelX-pw/2, labelY-ph, pw, ph, pr);
+      ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=0.5/vpScale; ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle='rgba(255,255,255,0.75)';
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText(pp.name, labelX, labelY);
     }
 
     // ── Bus width badge above the dot ──

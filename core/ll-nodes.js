@@ -125,6 +125,26 @@ function descHasThumbnail(def) {
   return !!_nodeRegistry[def.id]?.drawThumbnail;
 }
 
+// True when the node body has drawn content (mini displays or a drawBody hook).
+// Used by geometry and render to decide whether to show the header.
+function nodeHasBodyContent(node, def) {
+  if (_nodeRegistry[def.id]?.drawBody) return true;
+  if (!def.circuit) return false;
+  return _circuitHasThumbnails(def.circuit, new Set());
+}
+function _circuitHasThumbnails(circuit, visited) {
+  const circ = circuits[circuit.id] || circuit;
+  if (!circ || visited.has(circ.id)) return false;
+  visited.add(circ.id);
+  return Object.values(circ.nodes).some(n => {
+    const nd = blockDefs[n.defId];
+    if (!nd) return false;
+    if (descHasThumbnail(nd)) return true;
+    if (nd.circuit) return _circuitHasThumbnails(nd.circuit, visited);
+    return false;
+  });
+}
+
 // Thumbnail — draw the node's thumbnail representation
 function descDrawThumbnail(g, node, def) {
   const desc = _nodeRegistry[def.id];

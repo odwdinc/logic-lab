@@ -182,7 +182,7 @@ Technical constraints that influenced the decision.
 - `PORT_HIT = 11`: Port click hit radius  
 - `NLH = 22`: Node label header height
 - `NPS = 24`: Port spacing
-- `STUB_LEN = 18`: 1-bit gate port stub length
+- `STUB_LEN = 12`: 1-bit gate port stub length
 
 ### Descriptor Hooks (Most Common)
 - `logic(inp, node)`: Simulation logic

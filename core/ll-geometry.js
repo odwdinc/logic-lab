@@ -6,7 +6,7 @@
 const PORT_R   = 5;
 const PORT_HIT = 11;
 const NLH      = 22;   // node label header height
-const NPY      = 8;    // node body top padding
+const NPY      = 4;    // node body top/bottom padding
 const NPS      = 24;   // port spacing
 const NMW      = 76;   // min node width
 const IONG_SZ  = 12;   // bit grid cell size (slightly larger for 1-bit readability)
@@ -35,19 +35,23 @@ function nodeGeom(node){
   const outP=def.ports.filter(p=>p.dir==='out');
 
   const maxP=Math.max(inP.length,outP.length,1);
-  const minH=Math.max(NLH+NPY+maxP*NPS+NPY,42);
+  const hasBody=nodeHasBodyContent(node,def);
+  // margin: space from body edge to outermost port centre (port dot must not clip the border)
+  const margin=PORT_R+NPY;
+  const minH=Math.max((hasBody?NLH:0)+2*margin+(maxP>1?(maxP-1)*NPS:0),42);
   const labelW=def.name.length*8+28;
   const minW=Math.max(NMW,labelW);
   const w=Math.max(minW, node._w||0);
   const h=Math.max(minH, node._h||0);
 
-  // Evenly distribute ports vertically across the body area below the header.
-  // Body spans from NLH to h. Divide into (count+1) equal slots so ports are
-  // centred between header and bottom edge regardless of resize.
+  // Spread ports from margin-from-top to margin-from-bottom.
+  // A single port sits at the vertical centre; multiple ports span edge-to-edge.
   function portYs(count){
-    const bodyH=h-NLH;
+    const top=hasBody?NLH:0;
+    const bodyH=h-top;
+    if(count===1) return [top+bodyH/2];
     const ys=[];
-    for(let i=0;i<count;i++) ys.push(NLH + bodyH*(i+1)/(count+1));
+    for(let i=0;i<count;i++) ys.push(top+margin+(bodyH-2*margin)*i/(count-1));
     return ys;
   }
 
@@ -63,7 +67,7 @@ function nodeGeom(node){
   return {x:node.x,y:node.y,w,h,ports};
 }
 
-const STUB_LEN = 18; // stub length — only for 1-bit gate ports
+const STUB_LEN = 12; // stub length — only for 1-bit gate ports
 
 function portWorldPos(node,portId){
   const g=nodeGeom(node); const p=g.ports[portId]; if(!p) return null;
